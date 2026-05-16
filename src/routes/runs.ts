@@ -46,7 +46,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
               },
             },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { startedAt: 'desc' },
           skip,
           take: parseInt(limit),
         }),
@@ -163,8 +163,8 @@ export async function runsRoutes(fastify: FastifyInstance) {
             status: success ? 'success' : 'failed',
             completedAt: new Date(),
             durationMs: Math.floor(Math.random() * 2000) + 200,
-            executionData: { retry: true },
-            errorMessage: success ? null : 'Retry failed',
+            executionData: success ? undefined : { retry: true },
+            errorMessage: success ? undefined : 'Retry failed',
           },
         });
 
@@ -209,7 +209,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
         }),
         prisma.workflowRun.findMany({
           where: { workflow: { userId: user.userId } },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { startedAt: 'desc' },
           take: 5,
           include: {
             workflow: { select: { id: true, name: true } },

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Plus, Play, Pause, Copy, Trash2, MoreHorizontal, Search, Filter, Loader2 } from 'lucide-react';
+import { Plus, Play, Pause, Trash2, MoreHorizontal, Search, Filter, Loader2 } from 'lucide-react';
 import { workflowsApi } from '../api';
 
 export default function Workflows() {

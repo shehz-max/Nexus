@@ -35,9 +35,9 @@ export async function workflowRoutes(fastify: FastifyInstance) {
         where: { userId: user.userId },
         orderBy: { updatedAt: 'desc' },
         include: {
-          workflowRuns: {
+          runs: {
             take: 5,
-            orderBy: { createdAt: 'desc' },
+            orderBy: { startedAt: 'desc' },
           },
         },
       });

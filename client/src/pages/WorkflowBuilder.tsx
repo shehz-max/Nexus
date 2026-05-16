@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Plus, Trash2, GripVertical, Zap, Loader2, Save, Play, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Loader2, Save, Settings } from 'lucide-react';
 import { integrationsApi, workflowsApi } from '../api';
 
 interface TriggerConfig {
@@ -19,7 +19,7 @@ interface ActionConfig {
 }
 
 interface Workflow {
-  id: string;
+  id?: string;
   name: string;
   description?: string;
   status: 'active' | 'paused' | 'draft';

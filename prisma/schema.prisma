@@ -87,11 +87,13 @@ model Connection {
   refreshToken     String?     @db.Text
   tokenExpiresAt   DateTime?
 
+  provider         String      @default("oauth")
   providerId       String?
   providerEmail    String?
   displayName      String?
 
   status           String      @default("active")
+  lastUsedAt       DateTime?
   lastSyncAt       DateTime?
   lastError        String?
 
@@ -112,6 +114,7 @@ model Workflow {
   description      String?
 
   status           String    @default("draft")
+  isActive         Boolean   @default(false)
   triggerConfig    Json      @default("{}")
   filters          Json?
   actions          Json      @default("[]")
@@ -170,6 +173,7 @@ model WorkflowRun {
 
   triggerData   Json?
   steps         Json      @default("[]")
+  executionData Json?
 
   errorMessage  String?
   errorStack    String?
@@ -177,6 +181,7 @@ model WorkflowRun {
   startedAt     DateTime  @default(now())
   completedAt   DateTime?
   durationMs    Int?
+  createdAt     DateTime  @default(now())
 
   @@index([workflowId])
   @@index([status])

@@ -55,8 +55,8 @@ export async function connectionRoutes(fastify: FastifyInstance) {
         integrationId: conn.integrationId,
         integration: conn.integration,
         provider: conn.provider,
-        accountId: conn.accountId,
-        accountName: conn.accountName,
+        providerId: conn.providerId,
+        displayName: conn.displayName,
         status: conn.status,
         lastUsedAt: conn.lastUsedAt,
         createdAt: conn.createdAt,
@@ -109,8 +109,8 @@ export async function connectionRoutes(fastify: FastifyInstance) {
       let connectionData: Record<string, unknown> = {};
       let refreshToken = '';
       let tokenExpiresAt: Date | null = null;
-      let accountId = '';
-      let accountName = '';
+      let providerId = '';
+      let displayName = '';
 
       if (provider === 'oauth' && code) {
         // In production, exchange code for tokens via OAuth endpoint
@@ -121,13 +121,14 @@ export async function connectionRoutes(fastify: FastifyInstance) {
         };
         refreshToken = 'mock_refresh_token_' + Date.now();
         tokenExpiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
-        accountId = user.userId.slice(0, 8);
-        accountName = user.email.split('@')[0];
+        providerId = user.userId.slice(0, 8);
+        displayName = user.email.split('@')[0];
       } else if (provider === 'api_key' && credentials) {
         connectionData = {
           apiKey: encrypt(JSON.stringify(credentials)),
         };
-        accountId = 'api_key_' + Date.now();
+        providerId = 'api_key_' + Date.now();
+        displayName = 'API Key Connection';
       }
 
       // Create connection
@@ -136,11 +137,11 @@ export async function connectionRoutes(fastify: FastifyInstance) {
           userId: user.userId,
           integrationId,
           provider,
-          credentials: JSON.stringify(connectionData),
+          accessToken: encrypt('mock_access_token'),
           refreshToken: refreshToken ? encrypt(refreshToken) : null,
           tokenExpiresAt,
-          accountId,
-          accountName,
+          providerId,
+          displayName,
           status: 'active',
         },
         include: {
@@ -166,7 +167,7 @@ export async function connectionRoutes(fastify: FastifyInstance) {
           integrationId: connection.integrationId,
           integration: connection.integration,
           provider: connection.provider,
-          accountName: connection.accountName,
+          displayName: connection.displayName,
           status: connection.status,
         },
       });
@@ -207,7 +208,7 @@ export async function connectionRoutes(fastify: FastifyInstance) {
           integrationId: connection.integrationId,
           integration: connection.integration,
           provider: connection.provider,
-          accountName: connection.accountName,
+          displayName: connection.displayName,
           status: connection.status,
           lastUsedAt: connection.lastUsedAt,
           createdAt: connection.createdAt,

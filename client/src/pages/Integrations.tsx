@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plug, Plus, Check, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Check, Loader2, Trash2 } from 'lucide-react';
 import { integrationsApi, connectionsApi } from '../api';
 
 export default function Integrations() {

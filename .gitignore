@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+client/dist/
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel/
+
+# Prisma
+*.db
+*.db-journal
+
+# Misc
+*.tsbuildinfo
+.turbo/
+
+# Legacy/Duplicate directories
+server/
+BACKEND_PLAN.md
+index.js
+simple-server.js
+seed.mjs
+*.bat
+*.ps1
+dev.mjs
+start-*.bat
+start-*.ps1

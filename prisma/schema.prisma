@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  avatarUrl     String?
+  plan          String    @default("free")
+  maxWorkflows  Int       @default(1)
+  maxRuns       Int       @default(100)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  connections   Connection[]
+  workflows     Workflow[]
+  apiKeys       ApiKey[]
+  auditLogs     AuditLog[]
+  preferences   UserPreference?
+  sessions      Session[]
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([refreshToken])
+}
+
+model UserPreference {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme         String   @default("dark")
+  timezone      String   @default("UTC")
+  notifications Json     @default("{\"email\": true, \"runs\": true, \"errors\": true}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Integration {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  name         String
+  description  String?
+  icon         String?
+  category     String?
+  authType     String   @default("oauth2")
+  authUrl      String?
+  tokenUrl     String?
+  scopes       String[]
+  triggers     Json     @default("[]")
+  actions      Json     @default("[]")
+  configSchema Json     @default("{}")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  connections      Connection[]
+  workflowTriggers WorkflowTrigger[]
+  workflowActions  WorkflowAction[]
+}
+
+model Connection {
+  id               String      @id @default(uuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integrationId    String
+  integration      Integration @relation(fields: [integrationId], references: [id])
+
+  accessToken      String      @db.Text
+  refreshToken     String?     @db.Text
+  tokenExpiresAt   DateTime?
+
+  providerId       String?
+  providerEmail    String?
+  displayName      String?
+
+  status           String      @default("active")
+  lastSyncAt       DateTime?
+  lastError        String?
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([integrationId])
+  @@index([status])
+}
+
+model Workflow {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name             String
+  description      String?
+
+  status           String    @default("draft")
+  triggerConfig    Json      @default("{}")
+  filters          Json?
+  actions          Json      @default("[]")
+  scheduleConfig   Json?
+
+  runCount         Int       @default(0)
+  successCount    Int       @default(0)
+  failureCount     Int       @default(0)
+  lastRunAt        DateTime?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  workflowTriggers WorkflowTrigger[]
+  workflowActions   WorkflowAction[]
+  runs             WorkflowRun[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model WorkflowTrigger {
+  id              String    @id @default(uuid())
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id])
+  triggerId       String
+  config          Json      @default("{}")
+  pollingInterval Int       @default(300)
+
+  @@index([workflowId])
+}
+
+model WorkflowAction {
+  id              String      @id @default(uuid())
+  workflowId      String
+  workflow        Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  connectionId    String
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id])
+  actionId        String
+  config          Json       @default("{}")
+  order           Int        @default(0)
+  continueOnError Boolean    @default(false)
+
+  @@index([workflowId])
+}
+
+model WorkflowRun {
+  id            String    @id @default(uuid())
+  workflowId    String
+  workflow      Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  status        String    @default("pending")
+
+  triggerData   Json?
+  steps         Json      @default("[]")
+
+  errorMessage  String?
+  errorStack    String?
+
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  durationMs    Int?
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keyHash     String    @unique
+  name        String?
+  permissions Json      @default("[\"read\"]")
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action       String
+  resourceType String?
+  resourceId   String?
+  details      Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

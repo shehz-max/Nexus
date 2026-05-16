@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { authApi } from '../api';
 
 interface User {
   id: string;
@@ -29,16 +30,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return;
     }
 
+    const token = localStorage.getItem('nexus_token');
+    if (!token) {
+      set({ isInitialized: true });
+      return;
+    }
+
     set({ isLoading: true });
     try {
-      const response = await fetch('/api/auth/me', { credentials: 'include' });
-      const data = await response.json();
+      const data = await authApi.me();
       if (data.success && data.data) {
-        set({ user: data.data.user, isLoading: false, isInitialized: true });
+        set({ user: data.data, isLoading: false, isInitialized: true });
       } else {
         set({ user: null, isLoading: false, isInitialized: true });
       }
     } catch (error) {
+      localStorage.removeItem('nexus_token');
       set({ user: null, isLoading: false, isInitialized: true });
     }
   },
@@ -46,16 +53,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   login: async (email: string, password: string) => {
     set({ isLoading: true, user: null });
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data) {
+      const data = await authApi.login(email, password);
+      if (data.success && data.data?.user) {
         set({ user: data.data.user, isLoading: false });
         return;
       } else {
@@ -70,7 +69,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   logout: async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await authApi.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

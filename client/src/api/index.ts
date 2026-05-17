@@ -11,10 +11,16 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     },
   });
 
-  const data = await response.json();
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Server returned non-JSON response: ${response.status}`);
+  }
 
   if (!response.ok) {
-    throw new Error(data.error?.message || 'Something went wrong');
+    throw new Error(data.error?.message || `Request failed with status ${response.status}`);
   }
 
   return data;
@@ -57,7 +63,7 @@ export const authApi = {
   },
   me: () => fetchAPI('/auth?action=me', { method: 'POST' }),
   register: async (email: string, password: string, name?: string) => {
-    const data = await fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
+    const data = await fetchAPI('/auth?action=register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
     if (data.data?.token) setToken(data.data.token);
     return data;
   },

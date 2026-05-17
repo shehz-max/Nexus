@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, User } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import { authApi } from '../api';
 
 const Logo = () => (
   <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -23,7 +24,6 @@ const Logo = () => (
 
 export default function Register() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,20 +38,16 @@ export default function Register() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name, email, password }),
-      });
+      const response = await authApi.register(email, password, name || undefined);
 
-      const data = await response.json();
-
-      if (data.success && data.data?.user) {
-        await login(email, password);
+      if (response.success && response.data?.user) {
+        const token = localStorage.getItem('nexus_token');
+        if (token) {
+          await useAuthStore.getState().checkAuth();
+        }
         navigate('/app');
       } else {
-        setError(data.error?.message || 'Registration failed');
+        setError(response.error?.message || 'Registration failed');
       }
     } catch (err: any) {
       setError(err.message || 'Registration failed');

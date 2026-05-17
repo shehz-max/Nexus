@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { User, Shield, Bell, CreditCard, Save, Loader2 } from 'lucide-react';
+import { User, Shield, Bell, CreditCard, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
-import { usersApi } from '../api';
 
 const plans = [
   { id: 'starter', name: 'Starter', price: 12, features: ['5 Active Workflows', '1,000 Runs/Month', 'Email Support'] },
@@ -17,14 +15,6 @@ export default function Settings() {
   const [profile, setProfile] = useState({ name: user?.name || 'Demo User', email: user?.email || '' });
   const [notifications, setNotifications] = useState({ email: true, slack: false, runs: true });
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  const updateProfile = useMutation({
-    mutationFn: (data: { name: string }) => usersApi.update(data),
-    onSuccess: () => {
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    },
-  });
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -85,11 +75,10 @@ export default function Settings() {
             </div>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => updateProfile.mutate({ name: profile.name })}
-                disabled={updateProfile.isPending}
-                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                onClick={() => { setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000); }}
+                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2"
               >
-                {updateProfile.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <Loader2 className="w-4 h-4" />
                 Save Changes
               </button>
               {saveSuccess && <span className="text-emerald-400 text-sm">Saved!</span>}

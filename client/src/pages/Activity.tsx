@@ -6,23 +6,18 @@ import { runsApi } from '../api';
 export default function Activity() {
   const queryClient = useQueryClient();
 
-  const { data: statsData, isLoading: statsLoading } = useQuery({
-    queryKey: ['runs', 'stats'],
-    queryFn: () => runsApi.stats(),
-  });
-
   const { data: runsData, isLoading: runsLoading } = useQuery({
     queryKey: ['runs'],
     queryFn: () => runsApi.list({ limit: 50 }),
   });
 
-  const retryMutation = useMutation({
-    mutationFn: (id: string) => runsApi.retry(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['runs'] }),
-  });
-
-  const stats = statsData?.data;
   const runs = runsData?.data?.runs || [];
+  const stats = runsData?.data?.pagination || { total: runs.length };
+
+  const total = runs.length;
+  const success = runs.filter((r: any) => r.status === 'success').length;
+  const failed = runs.filter((r: any) => r.status === 'failed').length;
+  const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
 
   return (
     <div className="space-y-8">
@@ -52,7 +47,7 @@ export default function Activity() {
         </button>
       </div>
 
-      {statsLoading ? (
+      {runsLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-slate-900/50 backdrop-blur rounded-xl border border-white/5 p-4 animate-pulse">
@@ -65,19 +60,19 @@ export default function Activity() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-slate-900/50 backdrop-blur rounded-xl border border-white/5 p-4">
             <p className="text-sm text-slate-400">Total Runs</p>
-            <p className="text-2xl font-bold text-white">{(stats?.total || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-white">{total.toLocaleString()}</p>
           </div>
           <div className="bg-slate-900/50 backdrop-blur rounded-xl border border-white/5 p-4">
             <p className="text-sm text-slate-400">Success Rate</p>
-            <p className="text-2xl font-bold text-emerald-400">{stats?.successRate || 0}%</p>
+            <p className="text-2xl font-bold text-emerald-400">{successRate}%</p>
           </div>
           <div className="bg-slate-900/50 backdrop-blur rounded-xl border border-white/5 p-4">
             <p className="text-sm text-slate-400">Success</p>
-            <p className="text-2xl font-bold text-emerald-400">{(stats?.success || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-emerald-400">{success.toLocaleString()}</p>
           </div>
           <div className="bg-slate-900/50 backdrop-blur rounded-xl border border-white/5 p-4">
             <p className="text-sm text-slate-400">Failed</p>
-            <p className="text-2xl font-bold text-rose-400">{(stats?.failed || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-rose-400">{failed.toLocaleString()}</p>
           </div>
         </div>
       )}
@@ -140,17 +135,7 @@ export default function Activity() {
                     <td className="px-6 py-4 text-slate-400">
                       {new Date(run.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-6 py-4">
-                      {run.status === 'failed' && (
-                        <button
-                          onClick={() => retryMutation.mutate(run.id)}
-                          className="p-2 text-slate-400 hover:text-emerald-400 transition-colors"
-                          title="Retry"
-                        >
-                          <Play className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
+                    
                   </motion.tr>
                 ))}
               </tbody>

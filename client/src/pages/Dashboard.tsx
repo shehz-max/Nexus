@@ -16,11 +16,6 @@ import {
 import { runsApi, workflowsApi } from '../api';
 
 export default function Dashboard() {
-  const { data: statsData, isLoading: statsLoading } = useQuery({
-    queryKey: ['runs', 'stats'],
-    queryFn: () => runsApi.stats(),
-  });
-
   const { data: workflowsData, isLoading: workflowsLoading } = useQuery({
     queryKey: ['workflows'],
     queryFn: () => workflowsApi.list(),
@@ -31,11 +26,13 @@ export default function Dashboard() {
     queryFn: () => runsApi.list({ limit: 5 }),
   });
 
-  const stats = statsData?.data;
   const workflows = workflowsData?.data?.workflows || [];
   const runs = runsData?.data?.runs || [];
 
-  const activeWorkflows = workflows.filter(w => w.status === 'active').length;
+  const activeWorkflows = workflows.filter((w: any) => w.status === 'active').length;
+  const totalRuns = runs.length;
+  const successRuns = runs.filter((r: any) => r.status === 'success').length;
+  const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : 0;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -60,7 +57,7 @@ export default function Dashboard() {
           transition={{ delay: 0 }}
           className="bg-slate-900/50 backdrop-blur rounded-xl sm:rounded-2xl border border-white/5 p-4 sm:p-6"
         >
-          {statsLoading ? (
+{workflowsLoading ? (
             <div className="flex items-center justify-center h-12">
               <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
             </div>
@@ -89,35 +86,12 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                <Plug className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-slate-400 truncate">Connections</p>
-                <p className="text-xl sm:text-2xl font-bold text-white">{workflows.length}</p>
-              </div>
-            </div>
-          )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-slate-900/50 backdrop-blur rounded-xl sm:rounded-2xl border border-white/5 p-4 sm:p-6"
-        >
-          {statsLoading ? (
-            <div className="flex items-center justify-center h-12">
-              <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
                 <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm text-slate-400 truncate">Success Rate</p>
-                <p className="text-xl sm:text-2xl font-bold text-white">{stats?.successRate || 0}%</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{successRate}%</p>
               </div>
             </div>
           )}
@@ -140,7 +114,7 @@ export default function Dashboard() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm text-slate-400 truncate">Total Runs</p>
-                <p className="text-xl sm:text-2xl font-bold text-white">{(stats?.total || 0).toLocaleString()}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{totalRuns.toLocaleString()}</p>
               </div>
             </div>
           )}

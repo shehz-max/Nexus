@@ -4,6 +4,20 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+interface GitHubTokenResponse {
+  access_token: string;
+  token_type: string;
+  scope: string;
+}
+
+interface GitHubUser {
+  id: number;
+  email: string | null;
+  name: string | null;
+  login: string;
+  avatar_url: string;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code } = req.query;
 
@@ -28,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     });
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = (await tokenResponse.json()) as GitHubTokenResponse;
 
     if (!tokenData.access_token) {
       throw new Error('Failed to get access token');
@@ -38,14 +52,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'Nexus-App' },
     });
 
-    const githubUser = await userResponse.json();
+    const githubUser = (await userResponse.json()) as GitHubUser;
 
-    let user = await prisma.user.findUnique({ where: { email: githubUser.email } });
+    let user = await prisma.user.findUnique({ where: { email: githubUser.email! } });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          email: githubUser.email,
+          email: githubUser.email!,
           name: githubUser.name || githubUser.login,
           passwordHash: await bcrypt.hash(Math.random().toString(36), 12),
           avatarUrl: githubUser.avatar_url,

@@ -13,6 +13,11 @@ function getUserIdFromToken(authHeader: string | undefined): string | null {
   } catch { return null; }
 }
 
+async function authUser(prisma: PrismaClient, req: VercelRequest): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  return getUserIdFromToken(authHeader);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
   const userId = getUserIdFromToken(req.headers.authorization);

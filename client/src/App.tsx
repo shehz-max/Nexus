@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import AuthSuccess from './pages/AuthSuccess';
 import Dashboard from './pages/Dashboard';
 import Integrations from './pages/Integrations';
 import Workflows from './pages/Workflows';
@@ -43,6 +44,7 @@ function AppContent() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/auth/success" element={<AuthSuccess />} />
       <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="integrations" element={<Integrations />} />

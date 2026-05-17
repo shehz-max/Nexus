@@ -24,12 +24,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isInitialized: false,
 
   checkAuth: async () => {
-    const currentUser = get().user;
-    if (currentUser) {
-      set({ isInitialized: true });
-      return;
-    }
-
     const token = localStorage.getItem('nexus_token');
     if (!token) {
       set({ isInitialized: true });
@@ -42,6 +36,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       if (data.success && data.data) {
         set({ user: data.data, isLoading: false, isInitialized: true });
       } else {
+        localStorage.removeItem('nexus_token');
         set({ user: null, isLoading: false, isInitialized: true });
       }
     } catch (error) {

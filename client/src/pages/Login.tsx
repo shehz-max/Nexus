@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Github } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
@@ -23,6 +23,7 @@ const Logo = () => (
 );
 
 export default function Login() {
+  const navigate = useNavigate();
   const { login, isLoading } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +38,7 @@ export default function Login() {
     login(email, password)
       .then(() => {
         console.log('Login succeeded, redirecting to /app');
-        window.location.href = '/app';
+        navigate('/app', { replace: true });
       })
       .catch((err) => {
         console.log('Login failed:', err.message);

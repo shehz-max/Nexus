@@ -24,14 +24,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, user, isInitialized } = useAuthStore();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (isInitialized) {
+      setReady(true);
+      return;
+    }
     checkAuth().finally(() => setReady(true));
   }, []);
 
-  if (!ready) {
+  if (!ready || !isInitialized) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -42,8 +46,8 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/login" element={user ? <Navigate to="/app" replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/app" replace /> : <Register />} />
       <Route path="/auth/success" element={<AuthSuccess />} />
       <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />

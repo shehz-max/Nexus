@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Github } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import { authApi } from '../api';
 
 const Logo = () => (
   <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -180,7 +181,7 @@ export default function Login() {
           <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
-              onClick={() => window.location.href = '/api/auth/google'}
+              onClick={() => authApi.google()}
               className="flex items-center justify-center gap-2 py-4 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 hover:border-white/20 transition-all"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -190,7 +191,7 @@ export default function Login() {
             </button>
             <button
               type="button"
-              onClick={() => window.location.href = '/api/auth/github'}
+              onClick={() => authApi.github()}
               className="flex items-center justify-center gap-2 py-4 bg-slate-900/50 border border-white/10 rounded-xl hover:bg-slate-800/50 hover:border-white/20 transition-all"
             >
               <Github className="w-5 h-5 text-white" />

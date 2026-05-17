@@ -33,30 +33,6 @@ function setToken(token: string) {
   }
 }
 
-export const authApi = {
-  login: async (email: string, password: string) => {
-    const data = await fetchAPI('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    if (data.data?.token) {
-      setToken(data.data.token);
-    }
-    return data;
-  },
-  logout: async () => {
-    await fetchAPI('/auth/logout', { method: 'POST' });
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('nexus_token');
-    }
-  },
-  me: () => fetchAPI('/auth/me'),
-  register: async (email: string, password: string, name?: string) => {
-    const data = await fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
-    if (data.data?.token) {
-      setToken(data.data.token);
-    }
-    return data;
-  },
-};
-
 function authFetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -69,43 +45,54 @@ function authFetchAPI(endpoint: string, options: RequestInit = {}) {
   return fetchAPI(endpoint, { ...options, headers });
 }
 
-export const usersApi = {
-  me: () => authFetchAPI('/users/me'),
-  update: (data: { name?: string }) => authFetchAPI('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+export const authApi = {
+  login: async (email: string, password: string) => {
+    const data = await fetchAPI('/auth?action=login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    if (data.data?.token) setToken(data.data.token);
+    return data;
+  },
+  logout: async () => {
+    await fetchAPI('/auth?action=logout', { method: 'POST' });
+    if (typeof window !== 'undefined') localStorage.removeItem('nexus_token');
+  },
+  me: () => fetchAPI('/auth?action=me', { method: 'POST' }),
+  register: async (email: string, password: string, name?: string) => {
+    const data = await fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
+    if (data.data?.token) setToken(data.data.token);
+    return data;
+  },
+  google: () => { window.location.href = '/api/auth?action=google'; },
+  github: () => { window.location.href = '/api/auth?action=github'; },
+  seed: () => fetchAPI('/auth?action=seed', { method: 'POST' }),
 };
 
 export const integrationsApi = {
-  list: () => fetchAPI('/integrations'),
+  list: () => fetchAPI('/index?resource=integrations'),
 };
 
 export const connectionsApi = {
-  list: () => authFetchAPI('/connections'),
-  create: (data: { integrationId: string; integrationSlug?: string; name?: string }) =>
-    authFetchAPI('/connections', { method: 'POST', body: JSON.stringify(data) }),
-  delete: (id: string) => authFetchAPI(`/connections/${id}`, { method: 'DELETE' }),
+  list: () => authFetchAPI('/index?resource=connections'),
+  create: (data: { integrationId: string }) => authFetchAPI('/index?resource=connections', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) => authFetchAPI('/index?resource=connections_delete', { method: 'POST', body: JSON.stringify({ id }) }),
 };
 
 export const workflowsApi = {
-  list: () => authFetchAPI('/workflows'),
-  get: (id: string) => authFetchAPI(`/workflows/${id}`),
-  create: (data: any) => authFetchAPI('/workflows', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => authFetchAPI(`/workflows/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  delete: (id: string) => authFetchAPI(`/workflows/${id}`, { method: 'DELETE' }),
-  enable: (id: string) => authFetchAPI(`/workflows/${id}/enable`, { method: 'POST' }),
-  disable: (id: string) => authFetchAPI(`/workflows/${id}/disable`, { method: 'POST' }),
-  runs: (id: string) => authFetchAPI(`/workflows/${id}/runs`),
+  list: () => authFetchAPI('/index?resource=workflows'),
+  get: (id: string) => authFetchAPI('/index?resource=workflows_get&id=' + id),
+  create: (data: any) => authFetchAPI('/index?resource=workflows', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => authFetchAPI('/index?resource=workflows_update', { method: 'POST', body: JSON.stringify({ id, ...data }) }),
+  delete: (id: string) => authFetchAPI('/index?resource=workflows_delete', { method: 'POST', body: JSON.stringify({ id }) }),
+  enable: (id: string) => authFetchAPI('/index?resource=workflows_update', { method: 'POST', body: JSON.stringify({ id, status: 'active', isActive: true }) }),
+  disable: (id: string) => authFetchAPI('/index?resource=workflows_update', { method: 'POST', body: JSON.stringify({ id, status: 'draft', isActive: false }) }),
 };
 
 export const runsApi = {
   list: (params?: { workflowId?: string; status?: string; page?: number; limit?: number }) => {
-    const searchParams = new URLSearchParams();
+    const searchParams = new URLSearchParams({ resource: 'runs' });
     if (params?.workflowId) searchParams.set('workflowId', params.workflowId);
     if (params?.status) searchParams.set('status', params.status);
     if (params?.page) searchParams.set('page', String(params.page));
     if (params?.limit) searchParams.set('limit', String(params.limit));
-    const query = searchParams.toString();
-    return authFetchAPI(`/runs${query ? `?${query}` : ''}`);
+    return authFetchAPI('/index?' + searchParams.toString());
   },
-  retry: (id: string) => authFetchAPI(`/runs/${id}/retry`, { method: 'POST' }),
-  stats: () => authFetchAPI('/runs/stats'),
 };

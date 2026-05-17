@@ -57,7 +57,7 @@ export default function Dashboard() {
           transition={{ delay: 0 }}
           className="bg-slate-900/50 backdrop-blur rounded-xl sm:rounded-2xl border border-white/5 p-4 sm:p-6"
         >
-{workflowsLoading ? (
+          {workflowsLoading ? (
             <div className="flex items-center justify-center h-12">
               <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
             </div>
@@ -86,6 +86,29 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Plug className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-slate-400 truncate">Connections</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{workflows.length}</p>
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-slate-900/50 backdrop-blur rounded-xl sm:rounded-2xl border border-white/5 p-4 sm:p-6"
+        >
+          {runsLoading ? (
+            <div className="flex items-center justify-center h-12">
+              <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
                 <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
               </div>
@@ -103,7 +126,7 @@ export default function Dashboard() {
           transition={{ delay: 0.15 }}
           className="bg-slate-900/50 backdrop-blur rounded-xl sm:rounded-2xl border border-white/5 p-4 sm:p-6"
         >
-          {statsLoading ? (
+          {runsLoading ? (
             <div className="flex items-center justify-center h-12">
               <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
             </div>
@@ -196,8 +219,8 @@ export default function Dashboard() {
                     <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 flex-shrink-0 animate-spin" />
                   )}
                   <div className="min-w-0">
-                    <p className="font-medium text-white text-sm sm:text-base truncate">{run.workflowName}</p>
-                    <p className="text-xs sm:text-sm text-slate-500">{new Date(run.createdAt).toLocaleString()}</p>
+                    <p className="font-medium text-white text-sm sm:text-base truncate">{run.workflowName || 'Workflow Run'}</p>
+                    <p className="text-xs sm:text-sm text-slate-500">{new Date(run.startedAt).toLocaleString()}</p>
                   </div>
                 </div>
                 <span

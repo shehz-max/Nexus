@@ -79,7 +79,7 @@ export const integrationsApi = {
 export const connectionsApi = {
   list: () => authFetchAPI('/index?resource=connections'),
   create: (data: { integrationId: string }) => authFetchAPI('/index?resource=connections', { method: 'POST', body: JSON.stringify(data) }),
-  delete: (id: string) => authFetchAPI('/index?resource=connections_delete', { method: 'POST', body: JSON.stringify({ id }) }),
+  delete: (id: string) => authFetchAPI('/index?resource=connections', { method: 'DELETE', body: JSON.stringify({ id }) }),
 };
 
 export const workflowsApi = {

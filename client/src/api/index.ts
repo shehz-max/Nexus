@@ -101,4 +101,21 @@ export const runsApi = {
     if (params?.limit) searchParams.set('limit', String(params.limit));
     return authFetchAPI('/index?' + searchParams.toString());
   },
+  get: (id: string) => authFetchAPI('/index?resource=runs_get&id=' + id),
+};
+
+export const triggerApi = {
+  test: (data: { integrationId: string; triggerId: string; config?: Record<string, any> }) =>
+    authFetchAPI('/index?resource=trigger_test', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const actionApi = {
+  test: (data: { integrationId: string; actionId: string; config?: Record<string, any>; sampleData?: any }) =>
+    authFetchAPI('/index?resource=action_test', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const workflowApi = {
+  activate: (id: string) => authFetchAPI('/index?resource=workflow_activate', { method: 'POST', body: JSON.stringify({ id }) }),
+  triggerManual: (id: string, triggerData?: any) => authFetchAPI('/index?resource=workflow_trigger_manual', { method: 'POST', body: JSON.stringify({ id, triggerData }) }),
+  duplicate: (id: string) => authFetchAPI('/index?resource=workflow_duplicate', { method: 'POST', body: JSON.stringify({ id }) }),
 };

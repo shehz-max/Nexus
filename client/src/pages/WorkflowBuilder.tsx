@@ -1,18 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Plus, Trash2, GripVertical, Loader2, Save, Settings } from 'lucide-react';
-import { integrationsApi, workflowsApi } from '../api';
-
-interface TriggerConfig {
-  triggerId: string;
-  integrationId: string;
-  config: Record<string, any>;
-}
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeft, Plus, Trash2, Loader2, Save, Settings,
+  Play, CheckCircle2, XCircle, Zap, ChevronRight, ChevronDown,
+  Copy, TestTube, AlertCircle, ArrowRight, Eye, GripVertical
+} from 'lucide-react';
+import { integrationsApi, workflowsApi, triggerApi, actionApi } from '../api';
 
 interface ActionConfig {
-  id: number;
+  id: string;
   integrationId: string;
   actionId: string;
   config: Record<string, any>;
@@ -23,9 +21,15 @@ interface Workflow {
   name: string;
   description?: string;
   status: 'active' | 'paused' | 'draft';
-  trigger?: TriggerConfig;
+  trigger: {
+    integrationId: string;
+    triggerId: string;
+    config: Record<string, any>;
+  } | null;
   actions: ActionConfig[];
 }
+
+type Step = 'name' | 'trigger-app' | 'trigger-event' | 'trigger-config' | 'trigger-test' | 'actions' | 'review';
 
 export default function WorkflowBuilder() {
   const navigate = useNavigate();
@@ -33,13 +37,21 @@ export default function WorkflowBuilder() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
 
+  const [step, setStep] = useState<Step>('name');
   const [workflow, setWorkflow] = useState<Workflow>({
     name: '',
     description: '',
     status: 'draft',
+    trigger: null,
     actions: [],
   });
-  const [selectedTrigger, setSelectedTrigger] = useState<{ integrationId: string; triggerId: string } | null>(null);
+  const [triggerSample, setTriggerSample] = useState<any>(null);
+  const [actionSamples, setActionSamples] = useState<Record<string, any>>({});
+  const [expandedAction, setExpandedAction] = useState<string | null>(null);
+  const [showFieldMapper, setShowFieldMapper] = useState<string | null>(null);
+  const [testingTrigger, setTestingTrigger] = useState(false);
+  const [testingAction, setTestingAction] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: integrationsData, isLoading: integrationsLoading } = useQuery({
     queryKey: ['integrations'],
@@ -71,43 +83,101 @@ export default function WorkflowBuilder() {
   useEffect(() => {
     if (workflowData?.data?.workflow) {
       const w = workflowData.data.workflow;
+      const triggerConfig = typeof w.triggerConfig === 'string' ? JSON.parse(w.triggerConfig) : w.triggerConfig;
+      const actions = typeof w.actions === 'string' ? JSON.parse(w.actions) : w.actions;
       setWorkflow({
         name: w.name,
         description: w.description || '',
         status: w.status,
-        trigger: w.trigger,
-        actions: w.actions?.map((a: any, i: number) => ({
-          id: i,
+        trigger: triggerConfig?.integrationId ? triggerConfig : null,
+        actions: actions?.map((a: any) => ({
+          id: a.id || `action-${Date.now()}-${Math.random()}`,
           integrationId: a.integrationId,
           actionId: a.actionId,
           config: a.config || {},
         })) || [],
       });
-      if (w.trigger) {
-        setSelectedTrigger({ integrationId: w.trigger.integrationId, triggerId: w.trigger.triggerId });
+      if (triggerConfig?.integrationId) {
+        setStep('trigger-test');
       }
     }
   }, [workflowData]);
 
   const integrations = integrationsData?.data?.integrations || [];
+  const selectedTriggerIntegration = integrations.find((i: any) => i.id === workflow.trigger?.integrationId);
+  const selectedTrigger = selectedTriggerIntegration?.triggers?.find((t: any) => t.id === workflow.trigger?.triggerId);
 
+  const getIntegration = (id: string) => integrations.find((i: any) => i.id === id);
   const getIntegrationTriggers = (integrationId: string) => {
-    const integration = integrations.find((i: any) => i.id === integrationId);
+    const integration = getIntegration(integrationId);
     return integration?.triggers || [];
   };
-
   const getIntegrationActions = (integrationId: string) => {
-    const integration = integrations.find((i: any) => i.id === integrationId);
+    const integration = getIntegration(integrationId);
     return integration?.actions || [];
   };
+  const getAction = (integrationId: string, actionId: string) => {
+    const actions = getIntegrationActions(integrationId);
+    return actions.find((a: any) => a.id === actionId);
+  };
+
+  const testTrigger = useCallback(async () => {
+    if (!workflow.trigger?.integrationId || !workflow.trigger?.triggerId) return;
+    setTestingTrigger(true);
+    try {
+      const res = await triggerApi.test({
+        integrationId: workflow.trigger.integrationId,
+        triggerId: workflow.trigger.triggerId,
+        config: workflow.trigger.config,
+      });
+      setTriggerSample(res.data.sampleData);
+    } catch (e: any) {
+      setErrors({ trigger: e.message || 'Failed to test trigger' });
+    } finally {
+      setTestingTrigger(false);
+    }
+  }, [workflow.trigger]);
+
+  const testAction = useCallback(async (actionId: string) => {
+    const action = workflow.actions.find(a => a.id === actionId);
+    if (!action) return;
+    setTestingAction(actionId);
+    try {
+      const res = await actionApi.test({
+        integrationId: action.integrationId,
+        actionId: action.actionId,
+        config: action.config,
+        sampleData: triggerSample,
+      });
+      setActionSamples(prev => ({ ...prev, [actionId]: res.data.result }));
+    } catch (e: any) {
+      setErrors({ [`action-${actionId}`]: e.message || 'Failed to test action' });
+    } finally {
+      setTestingAction(null);
+    }
+  }, [workflow.actions, triggerSample]);
 
   const handleSave = () => {
-    const workflowData = {
-      name: workflow.name || 'Untitled Workflow',
+    if (!workflow.name) {
+      setErrors({ name: 'Workflow name is required' });
+      return;
+    }
+    if (!workflow.trigger?.integrationId || !workflow.trigger?.triggerId) {
+      setErrors({ trigger: 'Please configure a trigger' });
+      return;
+    }
+    if (workflow.actions.length === 0) {
+      setErrors({ actions: 'Add at least one action' });
+      return;
+    }
+
+    const data = {
+      name: workflow.name,
       description: workflow.description,
-      status: 'draft' as const,
-      trigger: selectedTrigger ? { ...selectedTrigger, config: {} } : null,
+      status: workflow.status,
+      trigger: workflow.trigger,
       actions: workflow.actions.map(a => ({
+        id: a.id,
         integrationId: a.integrationId,
         actionId: a.actionId,
         config: a.config,
@@ -115,37 +185,177 @@ export default function WorkflowBuilder() {
     };
 
     if (isEditing) {
-      updateMutation.mutate(workflowData);
+      updateMutation.mutate(data);
     } else {
-      createMutation.mutate(workflowData);
+      createMutation.mutate(data);
     }
   };
 
   const addAction = () => {
+    const newAction: ActionConfig = {
+      id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      integrationId: '',
+      actionId: '',
+      config: {},
+    };
+    setWorkflow({ ...workflow, actions: [...workflow.actions, newAction] });
+    setExpandedAction(newAction.id);
+  };
+
+  const removeAction = (actionId: string) => {
+    setWorkflow({ ...workflow, actions: workflow.actions.filter(a => a.id !== actionId) });
+    if (expandedAction === actionId) setExpandedAction(null);
+  };
+
+  const updateAction = (actionId: string, field: string, value: any) => {
     setWorkflow({
       ...workflow,
-      actions: [...workflow.actions, { id: Date.now(), integrationId: '', actionId: '', config: {} }],
+      actions: workflow.actions.map(a =>
+        a.id === actionId ? { ...a, [field]: value, ...(field === 'integrationId' ? { actionId: '', config: {} } : {}) } : a
+      ),
     });
   };
 
-  const removeAction = (id: number) => {
+  const updateActionConfig = (actionId: string, field: string, value: any) => {
     setWorkflow({
       ...workflow,
-      actions: workflow.actions.filter((a) => a.id !== id),
+      actions: workflow.actions.map(a =>
+        a.id === actionId ? { ...a, config: { ...a.config, [field]: value } } : a
+      ),
     });
   };
 
-  const updateAction = (id: number, field: string, value: string) => {
-    setWorkflow({
-      ...workflow,
-      actions: workflow.actions.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
-    });
+  const insertFieldMapping = (actionId: string, field: string, triggerField: string) => {
+    const currentValue = workflow.actions.find(a => a.id === actionId)?.config[field] || '';
+    const mapping = `{{trigger.${triggerField}}}`;
+    updateActionConfig(actionId, field, currentValue ? `${currentValue} ${mapping}` : mapping);
   };
 
-  const isLoading = integrationsLoading || (isEditing && workflowLoading);
-  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const getTriggerFields = () => {
+    if (!triggerSample) return [];
+    const flatten = (obj: any, prefix = ''): string[] => {
+      return Object.entries(obj).flatMap(([key, value]) => {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          return flatten(value, path);
+        }
+        return path;
+      });
+    };
+    return flatten(triggerSample);
+  };
 
-  if (isLoading) {
+  const renderFieldInput = (actionId: string, field: any) => {
+    const action = workflow.actions.find(a => a.id === actionId);
+    if (!action) return null;
+
+    const value = action.config[field.name] || '';
+    const hasMapping = typeof value === 'string' && value.includes('{{trigger.');
+
+    if (field.type === 'text') {
+      return (
+        <div className="relative">
+          <textarea
+            value={value}
+            onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
+            placeholder={hasMapping ? '' : `Enter ${field.label.toLowerCase()}...`}
+            rows={3}
+            className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm font-mono resize-none"
+          />
+          {triggerSample && (
+            <button
+              onClick={() => setShowFieldMapper(showFieldMapper === `${actionId}-${field.name}` ? null : `${actionId}-${field.name}`)}
+              className="absolute top-2 right-2 p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Insert field from trigger"
+            >
+              <Copy className="w-3.5 h-3.5 text-emerald-400" />
+            </button>
+          )}
+          {showFieldMapper === `${actionId}-${field.name}` && triggerSample && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/10 rounded-xl p-3 z-20 max-h-48 overflow-y-auto"
+            >
+              <p className="text-xs text-slate-400 mb-2 font-medium">Insert from trigger data:</p>
+              {getTriggerFields().map(f => (
+                <button
+                  key={f}
+                  onClick={() => { insertFieldMapping(actionId, field.name, f); setShowFieldMapper(null); }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition-colors font-mono"
+                >
+                  {f}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative">
+        <input
+          type={field.type === 'number' ? 'number' : 'text'}
+          value={value}
+          onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
+          placeholder={hasMapping ? '' : `Enter ${field.label.toLowerCase()}...`}
+          className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm font-mono"
+        />
+        {triggerSample && (
+          <button
+            onClick={() => setShowFieldMapper(showFieldMapper === `${actionId}-${field.name}` ? null : `${actionId}-${field.name}`)}
+            className="absolute top-2 right-2 p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+            title="Insert field from trigger"
+          >
+            <Copy className="w-3.5 h-3.5 text-emerald-400" />
+          </button>
+        )}
+        {showFieldMapper === `${actionId}-${field.name}` && triggerSample && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/10 rounded-xl p-3 z-20 max-h-48 overflow-y-auto"
+          >
+            <p className="text-xs text-slate-400 mb-2 font-medium">Insert from trigger data:</p>
+            {getTriggerFields().map(f => (
+              <button
+                key={f}
+                onClick={() => { insertFieldMapping(actionId, field.name, f); setShowFieldMapper(null); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition-colors font-mono"
+              >
+                {f}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </div>
+    );
+  };
+
+  const steps: { key: Step; label: string; num: number }[] = [
+    { key: 'name', label: 'Name', num: 1 },
+    { key: 'trigger-app', label: 'Trigger App', num: 2 },
+    { key: 'trigger-event', label: 'Trigger Event', num: 3 },
+    { key: 'trigger-config', label: 'Configure', num: 4 },
+    { key: 'trigger-test', label: 'Test', num: 5 },
+    { key: 'actions', label: 'Actions', num: 6 },
+    { key: 'review', label: 'Review', num: 7 },
+  ];
+
+  const currentStepIndex = steps.findIndex(s => s.key === step);
+
+  const nextStep = () => {
+    const idx = steps.findIndex(s => s.key === step);
+    if (idx < steps.length - 1) setStep(steps[idx + 1].key);
+  };
+
+  const prevStep = () => {
+    const idx = steps.findIndex(s => s.key === step);
+    if (idx > 0) setStep(steps[idx - 1].key);
+  };
+
+  if (integrationsLoading || (isEditing && workflowLoading)) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
@@ -155,6 +365,7 @@ export default function WorkflowBuilder() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -167,7 +378,7 @@ export default function WorkflowBuilder() {
             <h1 className="text-2xl font-bold text-white">
               {isEditing ? 'Edit Workflow' : 'Create Workflow'}
             </h1>
-            <p className="text-slate-400">Build your automation from scratch</p>
+            <p className="text-slate-400">Build your automation step by step</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -179,201 +390,586 @@ export default function WorkflowBuilder() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || !workflow.name}
+            disabled={createMutation.isPending || updateMutation.isPending}
             className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
           >
-            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            {createMutation.isPending || updateMutation.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Save className="w-5 h-5" />
+            )}
             {isEditing ? 'Update' : 'Create'} Workflow
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-white/5 p-6">
-        <input
-          type="text"
-          placeholder="Workflow name..."
-          value={workflow.name}
-          onChange={(e) => setWorkflow({ ...workflow, name: e.target.value })}
-          className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-xl text-white text-xl font-semibold placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 mb-6"
-        />
-
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">
-              1
-            </div>
-            <h2 className="text-lg font-semibold text-white">Trigger</h2>
-            <span className="text-sm text-slate-500">What starts this workflow?</span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-            {integrations.map((integration: any) => (
+      {/* Step Progress */}
+      <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-white/5 p-4">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {steps.map((s, i) => (
+            <div key={s.key} className="flex items-center gap-2 flex-shrink-0">
               <button
-                key={integration.id}
-                onClick={() => setSelectedTrigger({ integrationId: integration.id, triggerId: '' })}
-                className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${
-                  selectedTrigger?.integrationId === integration.id
-                    ? 'border-emerald-500 bg-emerald-500/10'
-                    : 'border-white/10 bg-slate-800/50 hover:border-white/20'
+                onClick={() => {
+                  if (i <= currentStepIndex) setStep(s.key);
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  s.key === step
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : i < currentStepIndex
+                    ? 'text-emerald-400 hover:bg-white/5'
+                    : 'text-slate-600'
                 }`}
               >
-                <span className="text-2xl">{integration.icon}</span>
-                <span className="text-sm text-slate-300">{integration.name}</span>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  s.key === step
+                    ? 'bg-emerald-500 text-slate-950'
+                    : i < currentStepIndex
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-slate-800 text-slate-600'
+                }`}>
+                  {i < currentStepIndex ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.num}
+                </div>
+                <span className="hidden sm:inline">{s.label}</span>
               </button>
-            ))}
-          </div>
-
-          {selectedTrigger?.integrationId && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-4 bg-slate-800/50 rounded-xl border border-white/5"
-            >
-              <label className="block text-sm text-slate-400 mb-2">Select Trigger Event</label>
-              <select
-                value={selectedTrigger.triggerId}
-                onChange={(e) => setSelectedTrigger({ ...selectedTrigger, triggerId: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-emerald-500/50"
-              >
-                <option value="">Choose a trigger...</option>
-                {getIntegrationTriggers(selectedTrigger.integrationId).map((trigger: any) => (
-                  <option key={trigger.id} value={trigger.id}>
-                    {trigger.name}
-                  </option>
-                ))}
-              </select>
-              {selectedTrigger.triggerId && (
-                <p className="mt-2 text-sm text-slate-500">
-                  {getIntegrationTriggers(selectedTrigger.integrationId).find((t: any) => t.id === selectedTrigger.triggerId)?.description}
-                </p>
+              {i < steps.length - 1 && (
+                <ChevronRight className="w-4 h-4 text-slate-700 flex-shrink-0" />
               )}
-            </motion.div>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
-              2
             </div>
-            <h2 className="text-lg font-semibold text-white">Actions</h2>
-            <span className="text-sm text-slate-500">What should happen?</span>
-          </div>
-
-          {workflow.actions.length === 0 ? (
-            <p className="text-center text-slate-500 py-8 mb-4">
-              No actions yet. Add an action to continue.
-            </p>
-          ) : (
-            workflow.actions.map((action, index) => (
-              <motion.div
-                key={action.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-start gap-3 mb-4"
-              >
-                <div className="flex items-center gap-2 pt-3">
-                  <GripVertical className="w-5 h-5 text-slate-500" />
-                  <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm">
-                    {index + 2}
-                  </div>
-                </div>
-
-                <div className="flex-1 p-4 bg-slate-800/50 rounded-xl border border-white/5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-2">App</label>
-                      <select
-                        value={action.integrationId}
-                        onChange={(e) => updateAction(action.id, 'integrationId', e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500/50"
-                      >
-                        <option value="">Select app...</option>
-                        {integrations.map((i: any) => (
-                          <option key={i.id} value={i.id}>
-                            {i.icon} {i.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-2">Action</label>
-                      <select
-                        value={action.actionId}
-                        onChange={(e) => updateAction(action.id, 'actionId', e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500/50"
-                        disabled={!action.integrationId}
-                      >
-                        <option value="">Select action...</option>
-                        {action.integrationId &&
-                          getIntegrationActions(action.integrationId).map((a: any) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {action.actionId && (
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <div className="flex items-center gap-2 text-sm text-slate-400 mb-2">
-                        <Settings className="w-4 h-4" />
-                        Configuration
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Configure action parameters..."
-                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 text-sm"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => removeAction(action.id)}
-                  className="p-3 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all mt-8"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </motion.div>
-            ))
-          )}
-
-          <button
-            onClick={addAction}
-            className="w-full py-4 border-2 border-dashed border-white/10 rounded-xl text-slate-400 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Add Action
-          </button>
+          ))}
         </div>
       </div>
 
+      {/* Step Content */}
       <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-white/5 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Workflow Summary</h3>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            workflow.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
-          }`}>
-            {workflow.status}
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="p-4 bg-slate-800/50 rounded-xl">
-            <p className="text-2xl font-bold text-white">{workflow.trigger ? 1 : 0}</p>
-            <p className="text-sm text-slate-400">Trigger</p>
-          </div>
-          <div className="p-4 bg-slate-800/50 rounded-xl">
-            <p className="text-2xl font-bold text-white">{workflow.actions.length}</p>
-            <p className="text-sm text-slate-400">Actions</p>
-          </div>
-          <div className="p-4 bg-slate-800/50 rounded-xl">
-            <p className="text-2xl font-bold text-emerald-400">0</p>
-            <p className="text-sm text-slate-400">Total Runs</p>
-          </div>
-        </div>
+        <AnimatePresence mode="wait">
+          {/* Step 1: Name */}
+          {step === 'name' && (
+            <motion.div
+              key="name"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Name your workflow</h2>
+                <p className="text-slate-400 text-sm">Give your automation a descriptive name</p>
+              </div>
+              <input
+                type="text"
+                placeholder="e.g., New Google Sheets row → Slack notification"
+                value={workflow.name}
+                onChange={(e) => { setWorkflow({ ...workflow, name: e.target.value }); setErrors({}); }}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50"
+              />
+              {errors.name && (
+                <p className="text-rose-400 text-sm flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" /> {errors.name}
+                </p>
+              )}
+              <textarea
+                placeholder="Description (optional)..."
+                value={workflow.description || ''}
+                onChange={(e) => setWorkflow({ ...workflow, description: e.target.value })}
+                rows={2}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm resize-none"
+              />
+              <div className="flex justify-end">
+                <button onClick={nextStep} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2">
+                  Continue <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 2: Trigger App */}
+          {step === 'trigger-app' && (
+            <motion.div
+              key="trigger-app"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Choose a trigger app</h2>
+                <p className="text-slate-400 text-sm">Which app will start this workflow?</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {integrations.map((integration: any) => (
+                  <button
+                    key={integration.id}
+                    onClick={() => {
+                      setWorkflow({ ...workflow, trigger: { integrationId: integration.id, triggerId: '', config: {} } });
+                      nextStep();
+                    }}
+                    className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${
+                      workflow.trigger?.integrationId === integration.id
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-white/10 bg-slate-800/50 hover:border-white/20'
+                    }`}
+                  >
+                    <span className="text-2xl">{integration.icon}</span>
+                    <span className="text-sm text-slate-300">{integration.name}</span>
+                    {integration.authType === 'none' && (
+                      <span className="text-xs text-slate-500">No auth needed</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  Back
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 3: Trigger Event */}
+          {step === 'trigger-event' && (
+            <motion.div
+              key="trigger-event"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Choose a trigger event</h2>
+                <p className="text-slate-400 text-sm">What event in {selectedTriggerIntegration?.name} starts this workflow?</p>
+              </div>
+              <div className="space-y-2">
+                {getIntegrationTriggers(workflow.trigger?.integrationId || '').map((trigger: any) => (
+                  <button
+                    key={trigger.id}
+                    onClick={() => {
+                      setWorkflow({ ...workflow, trigger: { ...workflow.trigger!, triggerId: trigger.id } });
+                      nextStep();
+                    }}
+                    className={`w-full p-4 rounded-xl border transition-all text-left flex items-center gap-4 ${
+                      workflow.trigger?.triggerId === trigger.id
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-white/10 bg-slate-800/50 hover:border-white/20'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      trigger.type === 'webhook' ? 'bg-amber-500/20' : trigger.type === 'schedule' ? 'bg-blue-500/20' : 'bg-emerald-500/20'
+                    }`}>
+                      {trigger.type === 'webhook' ? <Zap className="w-5 h-5 text-amber-400" /> :
+                       trigger.type === 'schedule' ? <Play className="w-5 h-5 text-blue-400" /> :
+                       <Play className="w-5 h-5 text-emerald-400" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-white">{trigger.name}</p>
+                      <p className="text-sm text-slate-400">{trigger.description}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      trigger.type === 'webhook' ? 'bg-amber-500/20 text-amber-400' :
+                      trigger.type === 'schedule' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-emerald-500/20 text-emerald-400'
+                    }`}>
+                      {trigger.type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  Back
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 4: Trigger Config */}
+          {step === 'trigger-config' && (
+            <motion.div
+              key="trigger-config"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Configure trigger</h2>
+                <p className="text-slate-400 text-sm">Set up your {selectedTrigger?.name} trigger</p>
+              </div>
+              {selectedTrigger?.type === 'schedule' && (
+                <div className="p-4 bg-slate-800/50 rounded-xl border border-white/5">
+                  <p className="text-sm text-slate-300 mb-2">Schedule: <span className="font-mono text-emerald-400">{selectedTrigger.schedule}</span></p>
+                  <p className="text-xs text-slate-500">This trigger runs automatically on the schedule above.</p>
+                </div>
+              )}
+              {selectedTrigger?.type === 'webhook' && (
+                <div className="p-4 bg-slate-800/50 rounded-xl border border-white/5">
+                  <p className="text-sm text-slate-300 mb-2">Webhook URL will be generated after activation</p>
+                  <p className="text-xs text-slate-500">Send POST requests to this URL to trigger your workflow.</p>
+                </div>
+              )}
+              {selectedTrigger?.type === 'polling' && (
+                <div className="p-4 bg-slate-800/50 rounded-xl border border-white/5">
+                  <p className="text-sm text-slate-300 mb-2">Polling: Checks for new data every 15 minutes</p>
+                  <p className="text-xs text-slate-500">Upgrade to reduce polling interval.</p>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  Back
+                </button>
+                <button onClick={nextStep} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2">
+                  Continue <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 5: Test Trigger */}
+          {step === 'trigger-test' && (
+            <motion.div
+              key="trigger-test"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Test your trigger</h2>
+                <p className="text-slate-400 text-sm">Fetch sample data to use in your actions</p>
+              </div>
+              <button
+                onClick={testTrigger}
+                disabled={testingTrigger}
+                className="w-full py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {testingTrigger ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <TestTube className="w-5 h-5" />
+                )}
+                {testingTrigger ? 'Fetching sample data...' : 'Test Trigger'}
+              </button>
+              {triggerSample && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 bg-slate-800/50 rounded-xl border border-white/5"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    <p className="text-sm font-medium text-emerald-400">Sample data received</p>
+                  </div>
+                  <pre className="text-xs text-slate-300 font-mono bg-slate-900/50 p-3 rounded-lg overflow-x-auto">
+                    {JSON.stringify(triggerSample, null, 2)}
+                  </pre>
+                </motion.div>
+              )}
+              {errors.trigger && (
+                <p className="text-rose-400 text-sm flex items-center gap-1">
+                  <XCircle className="w-4 h-4" /> {errors.trigger}
+                </p>
+              )}
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  Back
+                </button>
+                <button onClick={nextStep} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2">
+                  Continue <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 6: Actions */}
+          {step === 'actions' && (
+            <motion.div
+              key="actions"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Add actions</h2>
+                <p className="text-slate-400 text-sm">What should happen after the trigger fires?</p>
+              </div>
+
+              {/* Trigger Summary */}
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Trigger: {selectedTriggerIntegration?.name}</p>
+                  <p className="text-xs text-slate-400">{selectedTrigger?.name}</p>
+                </div>
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              </div>
+
+              {/* Actions List */}
+              <div className="space-y-3">
+                {workflow.actions.map((action, index) => {
+                  const actionIntegration = getIntegration(action.integrationId);
+                  const actionDef = getAction(action.integrationId, action.actionId);
+                  const isExpanded = expandedAction === action.id;
+
+                  return (
+                    <motion.div
+                      key={action.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="border border-white/10 rounded-xl overflow-hidden"
+                    >
+                      {/* Action Header */}
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400">
+                          {index + 2}
+                        </div>
+                        <button
+                          onClick={() => setExpandedAction(isExpanded ? null : action.id)}
+                          className="flex-1 text-left"
+                        >
+                          {actionDef ? (
+                            <div>
+                              <p className="font-medium text-white">{actionIntegration?.icon} {actionDef.name}</p>
+                              <p className="text-xs text-slate-400">{actionIntegration?.name}</p>
+                            </div>
+                          ) : (
+                            <p className="text-slate-500">{action.integrationId ? 'Select action...' : 'Choose an app'}</p>
+                          )}
+                        </button>
+                        {actionSamples[action.id] && (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        )}
+                        <button
+                          onClick={() => removeAction(action.id)}
+                          className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setExpandedAction(isExpanded ? null : action.id)} className="p-2 text-slate-400 hover:text-white transition-colors">
+                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Action Body */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="p-4 border-t border-white/5 space-y-4">
+                              {/* App Selection */}
+                              {!action.integrationId ? (
+                                <div>
+                                  <label className="block text-sm text-slate-400 mb-2">Choose App</label>
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                    {integrations.filter((i: any) => i.actions.length > 0).map((integration: any) => (
+                                      <button
+                                        key={integration.id}
+                                        onClick={() => updateAction(action.id, 'integrationId', integration.id)}
+                                        className="p-3 rounded-lg border border-white/10 bg-slate-800/50 hover:border-white/20 transition-all flex flex-col items-center gap-1"
+                                      >
+                                        <span className="text-xl">{integration.icon}</span>
+                                        <span className="text-xs text-slate-300">{integration.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : !action.actionId ? (
+                                <div>
+                                  <label className="block text-sm text-slate-400 mb-2">Choose Action</label>
+                                  <div className="space-y-2">
+                                    {getIntegrationActions(action.integrationId).map((a: any) => (
+                                      <button
+                                        key={a.id}
+                                        onClick={() => updateAction(action.id, 'actionId', a.id)}
+                                        className="w-full p-3 rounded-lg border border-white/10 bg-slate-800/50 hover:border-white/20 transition-all text-left flex items-center gap-3"
+                                      >
+                                        <Play className="w-4 h-4 text-blue-400" />
+                                        <div>
+                                          <p className="text-sm font-medium text-white">{a.name}</p>
+                                          <p className="text-xs text-slate-400">{a.description}</p>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : actionDef ? (
+                                <>
+                                  {/* Action Config Fields */}
+                                  {actionDef.inputFields?.map((field: any) => (
+                                    <div key={field.name}>
+                                      <label className="block text-sm text-slate-400 mb-2">
+                                        {field.label} {field.required && <span className="text-rose-400">*</span>}
+                                      </label>
+                                      {renderFieldInput(action.id, field)}
+                                    </div>
+                                  ))}
+
+                                  {/* Test Action */}
+                                  <button
+                                    onClick={() => testAction(action.id)}
+                                    disabled={testingAction === action.id}
+                                    className="w-full py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-xl text-blue-400 font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                  >
+                                    {testingAction === action.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <TestTube className="w-4 h-4" />
+                                    )}
+                                    {testingAction === action.id ? 'Testing...' : 'Test Action'}
+                                  </button>
+
+                                  {actionSamples[action.id] && (
+                                    <div className="p-3 bg-slate-800/50 rounded-lg border border-white/5">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                        <p className="text-xs font-medium text-emerald-400">Test successful</p>
+                                      </div>
+                                      <pre className="text-xs text-slate-400 font-mono">
+                                        {JSON.stringify(actionSamples[action.id], null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </>
+                              ) : null}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+
+                {/* Add Action Button */}
+                <button
+                  onClick={addAction}
+                  className="w-full py-4 border-2 border-dashed border-white/10 rounded-xl text-slate-400 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Action
+                </button>
+              </div>
+
+              {errors.actions && (
+                <p className="text-rose-400 text-sm flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" /> {errors.actions}
+                </p>
+              )}
+
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  Back
+                </button>
+                <button onClick={nextStep} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2">
+                  Continue <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 7: Review */}
+          {step === 'review' && (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-2">Review workflow</h2>
+                <p className="text-slate-400 text-sm">Check your workflow before saving</p>
+              </div>
+
+              {/* Workflow Flow */}
+              <div className="space-y-3">
+                {/* Trigger */}
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <Zap className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-white">{selectedTriggerIntegration?.name}</p>
+                    <p className="text-sm text-slate-400">{selectedTrigger?.name}</p>
+                  </div>
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
+                    {selectedTrigger?.type}
+                  </span>
+                </div>
+
+                {/* Connector */}
+                <div className="flex justify-center">
+                  <ArrowRight className="w-5 h-5 text-slate-600 rotate-90" />
+                </div>
+
+                {/* Actions */}
+                {workflow.actions.map((action, index) => {
+                  const actionIntegration = getIntegration(action.integrationId);
+                  const actionDef = getAction(action.integrationId, action.actionId);
+                  return (
+                    <div key={action.id}>
+                      {index > 0 && (
+                        <div className="flex justify-center">
+                          <ArrowRight className="w-5 h-5 text-slate-600 rotate-90" />
+                        </div>
+                      )}
+                      <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400">
+                          {index + 2}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-white">{actionIntegration?.icon} {actionDef?.name || 'Action'}</p>
+                          <p className="text-sm text-slate-400">{actionIntegration?.name}</p>
+                        </div>
+                        {actionSamples[action.id] && (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 bg-slate-800/50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-white">1</p>
+                  <p className="text-sm text-slate-400">Trigger</p>
+                </div>
+                <div className="p-4 bg-slate-800/50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-white">{workflow.actions.length}</p>
+                  <p className="text-sm text-slate-400">Actions</p>
+                </div>
+                <div className="p-4 bg-slate-800/50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-emerald-400">0</p>
+                  <p className="text-sm text-slate-400">Total Runs</p>
+                </div>
+              </div>
+
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  Back
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {createMutation.isPending || updateMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                  {isEditing ? 'Update Workflow' : 'Create Workflow'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

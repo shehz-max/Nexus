@@ -2,33 +2,25 @@
   "name": "integration-hub",
   "type": "module",
   "version": "1.0.0",
-  "description": "SaaS workflow automation platform - simpler, affordable Zapier alternative",
-  "main": "dist/index.js",
+  "description": "SaaS workflow automation platform",
   "scripts": {
     "dev": "concurrently -n \"API,UI\" -c \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "tsx watch src/index.ts",
     "dev:frontend": "cd client && npm run dev",
     "build": "npm run build:backend && npm run build:frontend",
-    "build:backend": "tsc",
     "build:frontend": "cd client && npm run build",
     "start": "node dist/index.js",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "vercel:dev": "vercel dev"
+    "postinstall": "prisma generate"
   },
-  "keywords": ["automation", "integration", "saas", "small-business", "workflow"],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.10.0",
     "@vercel/node": "^3.0.0",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "prisma": "^5.10.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.11.0",
-    "prisma": "^5.10.0",
     "typescript": "^5.3.3"
   }
 }

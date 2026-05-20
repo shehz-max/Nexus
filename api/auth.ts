@@ -1,5 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
 
 function getUserIdFromToken(authHeader: string | undefined): string | null {
   if (!authHeader) return null;
@@ -10,11 +18,6 @@ function getUserIdFromToken(authHeader: string | undefined): string | null {
   } catch { return null; }
 }
 
-function createPrismaClient() {
-  const { PrismaClient } = require('@prisma/client');
-  return new PrismaClient({ log: ['error'] });
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
   const userId = getUserIdFromToken(req.headers.authorization);
@@ -22,8 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Content-Type', 'application/json');
 
   try {
-    const prisma = createPrismaClient();
-
     switch (action) {
       case 'login': {
         if (req.method !== 'POST') return res.status(405).json({ success: false, error: { message: 'Method not allowed' } });
@@ -31,24 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { email, password } = req.body || {};
         if (!email || !password) return res.status(400).json({ success: false, error: { statusCode: 400, message: 'Email and password required' } });
 
-        console.log('Login attempt for:', email);
         const user = await prisma.user.findUnique({ where: { email } });
-        
-        if (!user) {
-          console.log('User not found:', email);
-          return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
-        }
+        if (!user) return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
 
         const validPassword = await bcrypt.compare(password, user.passwordHash);
-        if (!validPassword) {
-          console.log('Invalid password for:', email);
-          return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
-        }
+        if (!validPassword) return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
 
         const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
-        console.log('Login success for:', email);
-
-        await prisma.$disconnect();
         return res.status(200).json({
           success: true,
           data: { user: { id: user.id, email: user.email, name: user.name, plan: user.plan, avatarUrl: user.avatarUrl }, token },
@@ -70,8 +60,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
-        await prisma.$disconnect();
-
         return res.status(201).json({
           success: true,
           data: { user: { id: user.id, email: user.email, name: user.name, plan: user.plan, avatarUrl: user.avatarUrl }, token },
@@ -87,7 +75,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           select: { id: true, email: true, name: true, plan: true, avatarUrl: true, maxWorkflows: true, maxRuns: true },
         });
 
-        await prisma.$disconnect();
         if (!user) return res.status(404).json({ success: false, error: { statusCode: 404, message: 'User not found' } });
         return res.status(200).json({ success: true, data: { user } });
       }
@@ -119,12 +106,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           create: { email: 'starter@nexus.io', passwordHash: starterPassword, name: 'Starter User', plan: 'starter', preferences: { create: { theme: 'dark', timezone: 'UTC' } } },
         });
 
-        await prisma.$disconnect();
         return res.status(200).json({ success: true, data: { users: [{ email: demoUser.email, password: 'demo1234', plan: demoUser.plan }, { email: starterUser.email, password: 'starter123', plan: starterUser.plan }] } });
       }
 
       default:
-        await prisma.$disconnect();
         return res.status(400).json({ success: false, error: { message: 'Invalid action' } });
     }
   } catch (error: any) {

@@ -1,7 +1,7 @@
 const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  const url = `${API_BASE}/api${endpoint}`;
+  const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
     ...options,
     credentials: 'include',

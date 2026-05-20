@@ -1177,6 +1177,97 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true, data: { templates: filtered } });
       }
 
+      case 'teams': {
+        const teams = await prisma.team.findMany({
+          where: { members: { some: { userId } } },
+          include: {
+            members: {
+              include: { userId: undefined, user: { select: { id: true, name: true, email: true, avatarUrl: true } } as any },
+              omit: { userId: true }
+            },
+            _count: { select: { members: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+        return res.status(200).json({ success: true, data: { teams } });
+      }
+
+      case 'team_create': {
+        if (!userId) return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+        const { name, slug, description } = req.body;
+        if (!name || !slug) return res.status(400).json({ success: false, error: { message: 'Name and slug required' } });
+
+        const existing = await prisma.team.findUnique({ where: { slug } });
+        if (existing) return res.status(400).json({ success: false, error: { message: 'Slug already taken' } });
+
+        const team = await prisma.team.create({
+          data: {
+            name,
+            slug,
+            description,
+            members: { create: { userId, role: 'owner' } }
+          },
+          include: { members: true }
+        });
+        return res.status(201).json({ success: true, data: { team } });
+      }
+
+      case 'team_invite': {
+        if (!userId) return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+        const { teamId, email, role } = req.body;
+        if (!teamId || !email) return res.status(400).json({ success: false, error: { message: 'Team ID and email required' } });
+
+        const member = await prisma.teamMember.findFirst({ where: { teamId, userId } });
+        if (!member || !['owner', 'admin'].includes(member.role)) {
+          return res.status(403).json({ success: false, error: { message: 'Insufficient permissions' } });
+        }
+
+        const token = Buffer.from(`${email}-${Date.now()}`).toString('base64');
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        const invitation = await prisma.teamInvitation.create({
+          data: { teamId, email, role: role || 'member', token, expiresAt }
+        });
+        return res.status(201).json({ success: true, data: { invitation, inviteUrl: `https://nexus.app/join/${token}` } });
+      }
+
+      case 'team_accept_invite': {
+        if (!userId) return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+        const { token } = req.body;
+        if (!token) return res.status(400).json({ success: false, error: { message: 'Token required' } });
+
+        const invitation = await prisma.teamInvitation.findUnique({ where: { token } });
+        if (!invitation || invitation.expiresAt < new Date()) {
+          return res.status(400).json({ success: false, error: { message: 'Invalid or expired invitation' } });
+        }
+
+        await prisma.teamMember.create({ data: { teamId: invitation.teamId, userId, role: invitation.role } });
+        await prisma.teamInvitation.delete({ where: { id: invitation.id } });
+
+        return res.status(200).json({ success: true, data: { message: 'Joined team successfully' } });
+      }
+
+      case 'team_remove_member': {
+        if (!userId) return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+        const { teamId, memberId } = req.body;
+
+        const requester = await prisma.teamMember.findFirst({ where: { teamId, userId } });
+        if (!requester || !['owner', 'admin'].includes(requester.role)) {
+          return res.status(403).json({ success: false, error: { message: 'Insufficient permissions' } });
+        }
+
+        await prisma.teamMember.deleteMany({ where: { teamId, id: memberId } });
+        return res.status(200).json({ success: true, data: { message: 'Member removed' } });
+      }
+
+      case 'team_leave': {
+        if (!userId) return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+        const { teamId } = req.body;
+
+        await prisma.teamMember.deleteMany({ where: { teamId, userId } });
+        return res.status(200).json({ success: true, data: { message: 'Left team' } });
+      }
+
       default:
         return res.status(400).json({ success: false, error: { message: 'Invalid resource' } });
     }

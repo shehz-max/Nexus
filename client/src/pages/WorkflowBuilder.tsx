@@ -10,6 +10,7 @@ import {
   GitBranch, Clock, Filter
 } from 'lucide-react';
 import { integrationsApi, workflowsApi, triggerApi, actionApi } from '../api';
+import WorkflowCanvas from '../components/WorkflowCanvas';
 
 interface ActionConfig {
   id: string;
@@ -72,6 +73,7 @@ export default function WorkflowBuilder() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [editingCondition, setEditingCondition] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'wizard' | 'canvas'>('wizard');
 
   const { data: integrationsData, isLoading: integrationsLoading } = useQuery({
     queryKey: ['integrations'],
@@ -487,77 +489,130 @@ export default function WorkflowBuilder() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/app/workflows')}
-            className="p-2 text-slate-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              {isEditing ? 'Edit Workflow' : 'Create Workflow'}
-            </h1>
-            <p className="text-slate-400">Build your automation step by step</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/app/workflows')}
-            className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={createMutation.isPending || updateMutation.isPending}
-            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            {createMutation.isPending || updateMutation.isPending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Save className="w-5 h-5" />
-            )}
-            {isEditing ? 'Update' : 'Create'} Workflow
-          </button>
-        </div>
-      </div>
+<div className="flex items-center gap-4">
+           <button
+             onClick={() => navigate('/app/workflows')}
+             className="p-2 text-slate-400 hover:text-white transition-colors"
+           >
+             <ArrowLeft className="w-6 h-6" />
+           </button>
+           <div>
+             <h1 className="text-2xl font-bold text-white">
+               {isEditing ? 'Edit Workflow' : 'Create Workflow'}
+             </h1>
+             <p className="text-slate-400">Build your automation step by step</p>
+           </div>
+         </div>
+         <div className="flex items-center gap-3">
+           {/* View Mode Toggle */}
+           {workflow.trigger && (
+             <div className="flex items-center gap-1 p-1 bg-slate-800/50 rounded-lg border border-white/5">
+               <button
+                 onClick={() => setViewMode('wizard')}
+                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                   viewMode === 'wizard'
+                     ? 'bg-emerald-500/20 text-emerald-400'
+                     : 'text-slate-400 hover:text-white'
+                 }`}
+               >
+                 Step-by-Step
+               </button>
+               <button
+                 onClick={() => setViewMode('canvas')}
+                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                   viewMode === 'canvas'
+                     ? 'bg-emerald-500/20 text-emerald-400'
+                     : 'text-slate-400 hover:text-white'
+                 }`}
+               >
+                 Canvas
+               </button>
+             </div>
+           )}
+           <button
+             onClick={() => navigate('/app/workflows')}
+             className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+           >
+             Cancel
+           </button>
+           <button
+             onClick={handleSave}
+             disabled={createMutation.isPending || updateMutation.isPending}
+             className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+           >
+             {createMutation.isPending || updateMutation.isPending ? (
+               <Loader2 className="w-5 h-5 animate-spin" />
+             ) : (
+               <Save className="w-5 h-5" />
+             )}
+             {isEditing ? 'Update' : 'Create'} Workflow
+           </button>
+         </div>
+       </div>
 
-      {/* Step Progress */}
-      <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-white/5 p-4">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => {
-                  if (i <= currentStepIndex) setStep(s.key);
-                }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  s.key === step
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : i < currentStepIndex
-                    ? 'text-emerald-400 hover:bg-white/5'
-                    : 'text-slate-600'
-                }`}
-              >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  s.key === step
-                    ? 'bg-emerald-500 text-slate-950'
-                    : i < currentStepIndex
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : 'bg-slate-800 text-slate-600'
-                }`}>
-                  {i < currentStepIndex ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.num}
-                </div>
-                <span className="hidden sm:inline">{s.label}</span>
-              </button>
-              {i < steps.length - 1 && (
-                <ChevronRight className="w-4 h-4 text-slate-700 flex-shrink-0" />
-              )}
-            </div>
-          ))}
+       {/* View Mode: Canvas */}
+       {viewMode === 'canvas' && workflow.trigger && (
+         <div className="h-[600px]">
+           <WorkflowCanvas
+             trigger={workflow.trigger}
+             triggerIntegration={selectedTriggerIntegration}
+             actions={workflow.actions}
+             conditions={conditions}
+             integrations={integrations}
+             onEditAction={(actionId) => {
+               setExpandedAction(actionId);
+               setStep('actions');
+               setViewMode('wizard');
+             }}
+             onEditTrigger={() => {
+               setStep('trigger-config');
+               setViewMode('wizard');
+             }}
+             onEditCondition={(conditionId) => {
+               setEditingCondition(conditionId);
+               setStep('actions');
+               setViewMode('wizard');
+             }}
+           />
+         </div>
+       )}
+
+{/* Step Progress */}
+      {viewMode === 'wizard' && (
+        <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-white/5 p-4">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {steps.map((s, i) => (
+              <div key={s.key} className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    if (i <= currentStepIndex) setStep(s.key);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    s.key === step
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : i < currentStepIndex
+                      ? 'text-emerald-400 hover:bg-white/5'
+                      : 'text-slate-600'
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    s.key === step
+                      ? 'bg-emerald-500 text-slate-950'
+                      : i < currentStepIndex
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-slate-800 text-slate-600'
+                  }`}>
+                    {i < currentStepIndex ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.num}
+                  </div>
+                  <span className="hidden sm:inline">{s.label}</span>
+                </button>
+                {i < steps.length - 1 && (
+                  <ChevronRight className="w-4 h-4 text-slate-700 flex-shrink-0" />
+                )}
+              </div>
+            ))}
         </div>
-      </div>
+      )}
 
       {/* Step Content */}
       <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-white/5 p-6">

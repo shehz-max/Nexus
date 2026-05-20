@@ -6,7 +6,8 @@ import {
   ArrowLeft, Plus, Trash2, Loader2, Save, Settings,
   Play, CheckCircle2, XCircle, Zap, ChevronRight, ChevronDown,
   Copy, TestTube, AlertCircle, ArrowRight, Eye, GripVertical,
-  Type, Hash, Calendar, List, ToggleLeft, Wand2, X, ChevronDown as ChevronDownIcon
+  Type, Hash, Calendar, List, ToggleLeft, Wand2, X, ChevronDown as ChevronDownIcon,
+  GitBranch, Clock, Filter
 } from 'lucide-react';
 import { integrationsApi, workflowsApi, triggerApi, actionApi } from '../api';
 
@@ -15,6 +16,17 @@ interface ActionConfig {
   integrationId: string;
   actionId: string;
   config: Record<string, any>;
+}
+
+interface Condition {
+  id: string;
+  type: 'filter' | 'if_else' | 'delay';
+  field: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty';
+  value: string;
+  delayMs?: number;
+  thenActions?: ActionConfig[];
+  elseActions?: ActionConfig[];
 }
 
 interface Workflow {
@@ -28,6 +40,7 @@ interface Workflow {
     config: Record<string, any>;
   } | null;
   actions: ActionConfig[];
+  conditions?: Condition[];
 }
 
 type Step = 'name' | 'trigger-app' | 'trigger-event' | 'trigger-config' | 'trigger-test' | 'actions' | 'review';
@@ -48,6 +61,7 @@ export default function WorkflowBuilder() {
     status: 'draft',
     trigger: templateData?.trigger || null,
     actions: templateData?.actions || [],
+    conditions: [],
   });
   const [triggerSample, setTriggerSample] = useState<any>(null);
   const [actionSamples, setActionSamples] = useState<Record<string, any>>({});
@@ -56,6 +70,8 @@ export default function WorkflowBuilder() {
   const [testingTrigger, setTestingTrigger] = useState(false);
   const [testingAction, setTestingAction] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [conditions, setConditions] = useState<Condition[]>([]);
+  const [editingCondition, setEditingCondition] = useState<string | null>(null);
 
   const { data: integrationsData, isLoading: integrationsLoading } = useQuery({
     queryKey: ['integrations'],
@@ -170,10 +186,6 @@ export default function WorkflowBuilder() {
       setErrors({ trigger: 'Please configure a trigger' });
       return;
     }
-    if (workflow.actions.length === 0) {
-      setErrors({ actions: 'Add at least one action' });
-      return;
-    }
 
     const data = {
       name: workflow.name,
@@ -218,6 +230,38 @@ export default function WorkflowBuilder() {
         a.id === actionId ? { ...a, [field]: value, ...(field === 'integrationId' ? { actionId: '', config: {} } : {}) } : a
       ),
     });
+  };
+
+  const reorderActions = (fromIndex: number, toIndex: number) => {
+    const newActions = [...workflow.actions];
+    const [removed] = newActions.splice(fromIndex, 1);
+    newActions.splice(toIndex, 0, removed);
+    setWorkflow({ ...workflow, actions: newActions });
+  };
+
+  const addCondition = (type: 'filter' | 'if_else' | 'delay') => {
+    const newCondition: Condition = {
+      id: `condition-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      type,
+      field: '',
+      operator: 'equals',
+      value: '',
+      ...(type === 'delay' ? { delayMs: 60000 } : {}),
+      ...(type === 'if_else' ? { thenActions: [], elseActions: [] } : {}),
+    };
+    setConditions([...conditions, newCondition]);
+    setEditingCondition(newCondition.id);
+  };
+
+  const removeCondition = (conditionId: string) => {
+    setConditions(conditions.filter(c => c.id !== conditionId));
+    if (editingCondition === conditionId) setEditingCondition(null);
+  };
+
+  const updateCondition = (conditionId: string, updates: Partial<Condition>) => {
+    setConditions(conditions.map(c =>
+      c.id === conditionId ? { ...c, ...updates } : c
+    ));
   };
 
   const updateActionConfig = (actionId: string, field: string, value: any) => {
@@ -797,7 +841,15 @@ export default function WorkflowBuilder() {
                     >
                       {/* Action Header */}
                       <div className="flex items-center gap-3 p-4 bg-slate-800/50">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400">
+                        {/* Drag Handle */}
+                        <div className="cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400">
+                          <GripVertical className="w-4 h-4" />
+                        </div>
+                        <div
+                          onClick={() => setExpandedAction(isExpanded ? null : action.id)}
+                          className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                          title="Drag to reorder"
+                        >
                           {index + 2}
                         </div>
                         <button
@@ -923,18 +975,164 @@ export default function WorkflowBuilder() {
                 {/* Add Action Button */}
                 <button
                   onClick={addAction}
-                  className="w-full py-4 border-2 border-dashed border-white/10 rounded-xl text-slate-400 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 border-2 border-dashed border-white/10 rounded-xl text-slate-400 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all flex items-center justify-center gap-2"
                 >
                   <Plus className="w-5 h-5" />
-                  Add Action
+                  Add Another Action
                 </button>
-              </div>
 
-              {errors.actions && (
-                <p className="text-rose-400 text-sm flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" /> {errors.actions}
-                </p>
-              )}
+                {/* Quick Add: Conditional */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/5"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 bg-slate-900 text-xs text-slate-500">or add logic</span>
+                  </div>
+                </div>
+
+                {/* Logic Options */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button 
+                    onClick={() => addCondition('if_else')}
+                    className="p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 hover:bg-violet-500/10 transition-all flex flex-col items-center gap-2 text-center"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                      <GitBranch className="w-5 h-5 text-violet-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Condition</p>
+                      <p className="text-xs text-slate-400">If/Else branching</p>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => addCondition('delay')}
+                    className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 transition-all flex flex-col items-center gap-2 text-center"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Delay</p>
+                      <p className="text-xs text-slate-400">Wait before continuing</p>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => addCondition('filter')}
+                    className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all flex flex-col items-center gap-2 text-center"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                      <Filter className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Filter</p>
+                      <p className="text-xs text-slate-400">Skip if condition met</p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Active Conditions */}
+                {conditions.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <div className="text-sm font-medium text-slate-400">Active Conditions ({conditions.length})</div>
+                    {conditions.map((condition, index) => (
+                      <div
+                        key={condition.id}
+                        className={`p-4 rounded-xl border ${
+                          condition.type === 'if_else' ? 'border-violet-500/30 bg-violet-500/5' :
+                          condition.type === 'delay' ? 'border-amber-500/30 bg-amber-500/5' :
+                          'border-cyan-500/30 bg-cyan-500/5'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            {condition.type === 'if_else' && <GitBranch className="w-4 h-4 text-violet-400" />}
+                            {condition.type === 'delay' && <Clock className="w-4 h-4 text-amber-400" />}
+                            {condition.type === 'filter' && <Filter className="w-4 h-4 text-cyan-400" />}
+                            <span className="text-sm font-medium text-white capitalize">{condition.type.replace('_', ' ')}</span>
+                            <span className="text-xs text-slate-500">#{index + 1}</span>
+                          </div>
+                          <button
+                            onClick={() => removeCondition(condition.id)}
+                            className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {condition.type === 'delay' ? (
+                          <div className="space-y-3">
+                            <label className="text-xs text-slate-400">Wait Duration</label>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="number"
+                                value={(condition.delayMs || 60000) / 1000}
+                                onChange={(e) => updateCondition(condition.id, { delayMs: parseInt(e.target.value) * 1000 })}
+                                className="w-24 px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                                min="1"
+                              />
+                              <select
+                                value="seconds"
+                                onChange={() => {}}
+                                className="px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-slate-400 text-sm"
+                              >
+                                <option value="seconds">seconds</option>
+                                <option value="minutes">minutes</option>
+                                <option value="hours">hours</option>
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-xs text-slate-400 mb-1 block">Field</label>
+                                <select
+                                  value={condition.field}
+                                  onChange={(e) => updateCondition(condition.id, { field: e.target.value })}
+                                  className="w-full px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                                >
+                                  <option value="">Select field...</option>
+                                  {getTriggerFields().map(f => (
+                                    <option key={f} value={`{{trigger.${f}}}`}>{f}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-slate-400 mb-1 block">Operator</label>
+                                <select
+                                  value={condition.operator}
+                                  onChange={(e) => updateCondition(condition.id, { operator: e.target.value as Condition['operator'] })}
+                                  className="w-full px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                                >
+                                  <option value="equals">equals</option>
+                                  <option value="not_equals">does not equal</option>
+                                  <option value="contains">contains</option>
+                                  <option value="not_contains">does not contain</option>
+                                  <option value="greater_than">is greater than</option>
+                                  <option value="less_than">is less than</option>
+                                  <option value="is_empty">is empty</option>
+                                  <option value="is_not_empty">is not empty</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-slate-400 mb-1 block">Value</label>
+                                <input
+                                  type="text"
+                                  value={condition.value}
+                                  onChange={(e) => updateCondition(condition.id, { value: e.target.value })}
+                                  placeholder="Enter value..."
+                                  className="w-full px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-between">
                 <button onClick={prevStep} className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">

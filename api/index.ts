@@ -754,6 +754,333 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(201).json({ success: true, data: { workflow: duplicated } });
       }
 
+      case 'templates': {
+        const templates = [
+          {
+            id: 'gmail-to-notion-task',
+            name: 'New Email to Notion Task',
+            description: 'Create a Notion task whenever you receive an email from a specific sender',
+            category: 'Operations',
+            icon: '📧',
+            popularity: 95,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '2 min',
+            trigger: { integrationId: 'gmail', triggerId: 'new_email_from', config: { senderFilter: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'notion', actionId: 'create_page', config: { database_id: '', title: '{{trigger.subject}}', properties: { Status: 'To Do', Priority: 'Medium' } } },
+            ],
+          },
+          {
+            id: 'sheets-to-slack-alert',
+            name: 'Spreadsheet Row to Slack Alert',
+            description: 'Send a Slack message when a new row is added to Google Sheets',
+            category: 'Operations',
+            icon: '📊',
+            popularity: 92,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'google_sheets', triggerId: 'new_row', config: { spreadsheet: '', sheet: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#alerts', text: 'New row added: {{trigger.data}}' } },
+            ],
+          },
+          {
+            id: 'github-issue-to-slack',
+            name: 'GitHub Issue to Slack Notification',
+            description: 'Get notified in Slack when a new GitHub issue is created',
+            category: 'Development',
+            icon: '🐙',
+            popularity: 89,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '4 min',
+            trigger: { integrationId: 'github', triggerId: 'new_issue', config: { repo: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#engineering', text: 'New issue: {{trigger.title}} by {{trigger.author}}' } },
+            ],
+          },
+          {
+            id: 'hubspot-contact-to-slack',
+            name: 'New HubSpot Contact Alert',
+            description: 'Notify your sales team in Slack when a new contact is created in HubSpot',
+            category: 'Sales',
+            icon: '🔷',
+            popularity: 87,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'hubspot', triggerId: 'new_contact', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#sales', text: 'New contact: {{trigger.firstName}} {{trigger.lastName}} ({{trigger.email}})' } },
+            ],
+          },
+          {
+            id: 'schedule-weekly-report',
+            name: 'Weekly Report to Email',
+            description: 'Send a weekly summary report to your team every Monday',
+            category: 'Communication',
+            icon: '📅',
+            popularity: 85,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '5 min',
+            trigger: { integrationId: 'schedule', triggerId: 'every_week', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'gmail', actionId: 'send_email', config: { to: 'team@company.com', subject: 'Weekly Report - {{date}}', body: 'Please find attached the weekly report...' } },
+            ],
+          },
+          {
+            id: 'notion-to-google-calendar',
+            name: 'Notion Task to Calendar Event',
+            description: 'Create a Google Calendar event when a task is created in Notion',
+            category: 'Productivity',
+            icon: '📝',
+            popularity: 83,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '4 min',
+            trigger: { integrationId: 'notion', triggerId: 'new_database_item', config: { database_id: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'google_calendar', actionId: 'create_event', config: { summary: '{{trigger.title}}', start: '{{trigger.dueDate}}', end: '{{trigger.dueDate}}' } },
+            ],
+          },
+          {
+            id: 'webhook-to-gmail',
+            name: 'Webhook to Email Notification',
+            description: 'Send an email notification when incoming webhook is received',
+            category: 'Communication',
+            icon: '🪝',
+            popularity: 80,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '2 min',
+            trigger: { integrationId: 'webhook', triggerId: 'incoming_webhook', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'gmail', actionId: 'send_email', config: { to: 'alerts@company.com', subject: 'Webhook Triggered: {{trigger.event}}', body: 'Received: {{trigger.data}}' } },
+            ],
+          },
+          {
+            id: 'gmail-to-google-sheets',
+            name: 'Email Data to Spreadsheet',
+            description: 'Log new emails with attachments to Google Sheets',
+            category: 'Operations',
+            icon: '📧',
+            popularity: 78,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'gmail', triggerId: 'new_attachment', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'google_sheets', actionId: 'create_row', config: { spreadsheet: '', sheet: 'Emails', values: { Date: '{{trigger.date}}', From: '{{trigger.from}}', Subject: '{{trigger.subject}}', Attachment: '{{trigger.attachment}}' } } },
+            ],
+          },
+          {
+            id: 'slack-to-notion',
+            name: 'Slack Message to Notion Page',
+            description: 'Create a Notion page when a message with specific keyword is posted',
+            category: 'Productivity',
+            icon: '💬',
+            popularity: 76,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'slack', triggerId: 'new_message_keyword', config: { keyword: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'notion', actionId: 'create_page', config: { parentId: '', title: 'Slack: {{trigger.text}}', content: 'From: {{trigger.user}}\nChannel: {{trigger.channel}}\n\n{{trigger.text}}' } },
+            ],
+          },
+          {
+            id: 'hubspot-deal-to-calendar',
+            name: 'HubSpot Deal Follow-up',
+            description: 'Create a calendar reminder when a deal reaches negotiation stage',
+            category: 'Sales',
+            icon: '🔷',
+            popularity: 74,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '4 min',
+            trigger: { integrationId: 'hubspot', triggerId: 'deal_stage_changed', config: { newStage: 'Negotiation' } },
+            actions: [
+              { id: 'action-1', integrationId: 'google_calendar', actionId: 'create_event', config: { summary: 'Follow up: {{trigger.dealName}}', start: '{{date+3days}}', end: '{{date+3days+1hour}}', description: 'Follow up on deal: ${{trigger.amount}}' } },
+            ],
+          },
+          {
+            id: 'github-pr-to-notify',
+            name: 'GitHub PR Review Request',
+            description: 'Notify in Slack when a PR needs review',
+            category: 'Development',
+            icon: '🐙',
+            popularity: 72,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '4 min',
+            trigger: { integrationId: 'github', triggerId: 'new_pull_request', config: { repo: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#code-review', text: 'PR Review Needed: {{trigger.title}}\nAuthor: {{trigger.author}}\nLink: {{trigger.url}}' } },
+            ],
+          },
+          {
+            id: 'daily-weather-reminder',
+            name: 'Daily Weather Reminder',
+            description: 'Send yourself a daily weather update every morning',
+            category: 'Personal',
+            icon: '☀️',
+            popularity: 70,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '2 min',
+            trigger: { integrationId: 'schedule', triggerId: 'every_day', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'gmail', actionId: 'send_email', config: { to: '{{user.email}}', subject: 'Good Morning! ☀️', body: 'Here is your daily weather update...' } },
+            ],
+          },
+          {
+            id: 'form-response-to-crm',
+            name: 'Form Response to CRM',
+            description: 'Add new form respondents to HubSpot as contacts',
+            category: 'Marketing',
+            icon: '📝',
+            popularity: 88,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '4 min',
+            trigger: { integrationId: 'webhook', triggerId: 'incoming_webhook_json', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'hubspot', actionId: 'create_contact', config: { email: '{{trigger.email}}', firstname: '{{trigger.firstName}}', lastname: '{{trigger.lastName}}', properties: { lead_source: 'Form' } } },
+              { id: 'action-2', integrationId: 'slack', actionId: 'send_message', config: { channel: '#leads', text: 'New lead: {{trigger.firstName}} {{trigger.lastName}}' } },
+            ],
+          },
+          {
+            id: 'new-tweet-mention',
+            name: 'New Twitter Mention',
+            description: 'Get notified and save new Twitter mentions to Notion',
+            category: 'Social',
+            icon: '🐦',
+            popularity: 65,
+            isVerified: true,
+            isNew: true,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'twitter', triggerId: 'new_mention', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_dm', config: { user: '{{user.twitter}}', text: 'You were mentioned by {{trigger.from}}: {{trigger.text}}' } },
+              { id: 'action-2', integrationId: 'notion', actionId: 'create_page', config: { parentId: '', title: 'Mention: {{trigger.from}}', content: 'Tweet: {{trigger.text}}\nLink: {{trigger.url}}' } },
+            ],
+          },
+          {
+            id: 'calendar-event-to-slack',
+            name: 'Calendar Event Reminder',
+            description: 'Send Slack reminder 15 minutes before calendar events',
+            category: 'Productivity',
+            icon: '📅',
+            popularity: 82,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'google_calendar', triggerId: 'event_started', config: { minutesBefore: 15 } },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#personal', text: '⏰ Upcoming: {{trigger.summary}} at {{trigger.start}}' } },
+            ],
+          },
+          {
+            id: 'google-sheets-approval',
+            name: 'Approval Workflow',
+            description: 'Send approval request when a spreadsheet row meets criteria',
+            category: 'Operations',
+            icon: '📊',
+            popularity: 77,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '5 min',
+            trigger: { integrationId: 'google_sheets', triggerId: 'cell_matching', config: { column: 'Status', value: 'Pending Approval' } },
+            actions: [
+              { id: 'action-1', integrationId: 'gmail', actionId: 'send_email', config: { to: 'manager@company.com', subject: 'Approval Needed: {{trigger.rowData.Product}}', body: 'Please review and approve the following request...' } },
+            ],
+          },
+          {
+            id: 'stripe-payment-notify',
+            name: 'Stripe Payment Alerts',
+            description: 'Notify your team in Slack when payments are received',
+            category: 'Payment',
+            icon: '💳',
+            popularity: 73,
+            isVerified: true,
+            isNew: true,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'stripe', triggerId: 'new_payment', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#revenue', text: '💰 Payment received: ${{trigger.amount/100}} from {{trigger.customer}}' } },
+              { id: 'action-2', integrationId: 'google_sheets', actionId: 'create_row', config: { spreadsheet: '', sheet: 'Payments', values: { Date: '{{trigger.date}}', Customer: '{{trigger.customer}}', Amount: '{{trigger.amount}}', Status: '{{trigger.status}}' } } },
+            ],
+          },
+          {
+            id: 'notion-task-reminder',
+            name: 'Notion Task Due Date Reminder',
+            description: 'Send Slack reminder when Notion task is due soon',
+            category: 'Productivity',
+            icon: '📝',
+            popularity: 71,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '3 min',
+            trigger: { integrationId: 'notion', triggerId: 'database_item_updated', config: {} },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#tasks', text: '⚠️ Task due soon: {{trigger.title}} - Due: {{trigger.dueDate}}' } },
+            ],
+          },
+          {
+            id: 'github-release-to-all',
+            name: 'GitHub Release Announcement',
+            description: 'Announce new releases across Slack and Email',
+            category: 'Development',
+            icon: '🐙',
+            popularity: 69,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '4 min',
+            trigger: { integrationId: 'github', triggerId: 'new_release', config: { repo: '' } },
+            actions: [
+              { id: 'action-1', integrationId: 'slack', actionId: 'send_message', config: { channel: '#announcements', text: '🎉 New Release: {{trigger.name}}\n{{trigger.body}}' } },
+              { id: 'action-2', integrationId: 'gmail', actionId: 'send_email', config: { to: 'subscribers@company.com', subject: 'New Version Released: {{trigger.name}}', body: 'We are excited to announce...{{trigger.body}}' } },
+            ],
+          },
+          {
+            id: 'new-signup-welcome',
+            name: 'New User Welcome Sequence',
+            description: 'Send welcome email and create Notion onboarding task for new signups',
+            category: 'Marketing',
+            icon: '🎉',
+            popularity: 86,
+            isVerified: true,
+            isNew: false,
+            estimatedTime: '5 min',
+            trigger: { integrationId: 'webhook', triggerId: 'incoming_webhook_json', config: { event: 'user.signup' } },
+            actions: [
+              { id: 'action-1', integrationId: 'gmail', actionId: 'send_email', config: { to: '{{trigger.email}}', subject: 'Welcome to Nexus! 🎉', body: 'Hi {{trigger.name}},\n\nWelcome aboard! We are excited to have you...' } },
+              { id: 'action-2', integrationId: 'notion', actionId: 'create_page', config: { parentId: '', title: 'Onboarding: {{trigger.name}}', content: 'New user: {{trigger.name}}\nEmail: {{trigger.email}}\nSigned up: {{trigger.date}}' } },
+            ],
+          },
+        ];
+
+        const { category, search } = req.query;
+        let filtered = templates;
+
+        if (category && category !== 'all') {
+          filtered = filtered.filter(t => t.category.toLowerCase() === (category as string).toLowerCase());
+        }
+
+        if (search) {
+          const searchLower = (search as string).toLowerCase();
+          filtered = filtered.filter(t =>
+            t.name.toLowerCase().includes(searchLower) ||
+            t.description.toLowerCase().includes(searchLower)
+          );
+        }
+
+        return res.status(200).json({ success: true, data: { templates: filtered } });
+      }
+
       default:
         return res.status(400).json({ success: false, error: { message: 'Invalid resource' } });
     }

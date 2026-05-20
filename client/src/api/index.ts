@@ -76,6 +76,15 @@ export const integrationsApi = {
   list: () => fetchAPI('/index?resource=integrations'),
 };
 
+export const templatesApi = {
+  list: (params?: { category?: string; search?: string }) => {
+    const searchParams = new URLSearchParams({ resource: 'templates' });
+    if (params?.category && params.category !== 'all') searchParams.set('category', params.category);
+    if (params?.search) searchParams.set('search', params.search);
+    return fetchAPI(`/index?${searchParams.toString()}`);
+  },
+};
+
 export const connectionsApi = {
   list: () => authFetchAPI('/index?resource=connections'),
   create: (data: { integrationId: string }) => authFetchAPI('/index?resource=connections', { method: 'POST', body: JSON.stringify(data) }),

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Plus, Trash2, Loader2, Save, Settings,
   Play, CheckCircle2, XCircle, Zap, ChevronRight, ChevronDown,
-  Copy, TestTube, AlertCircle, ArrowRight, Eye, GripVertical
+  Copy, TestTube, AlertCircle, ArrowRight, Eye, GripVertical,
+  Type, Hash, Calendar, List, ToggleLeft, Wand2, X, ChevronDown as ChevronDownIcon
 } from 'lucide-react';
 import { integrationsApi, workflowsApi, triggerApi, actionApi } from '../api';
 
@@ -37,13 +38,16 @@ export default function WorkflowBuilder() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
 
+  const location = useLocation();
+  const templateData = location.state?.template as { name?: string; description?: string; trigger?: any; actions?: any[] } | undefined;
+
   const [step, setStep] = useState<Step>('name');
   const [workflow, setWorkflow] = useState<Workflow>({
-    name: '',
-    description: '',
+    name: templateData?.name || '',
+    description: templateData?.description || '',
     status: 'draft',
-    trigger: null,
-    actions: [],
+    trigger: templateData?.trigger || null,
+    actions: templateData?.actions || [],
   });
   const [triggerSample, setTriggerSample] = useState<any>(null);
   const [actionSamples, setActionSamples] = useState<Record<string, any>>({});
@@ -225,12 +229,6 @@ export default function WorkflowBuilder() {
     });
   };
 
-  const insertFieldMapping = (actionId: string, field: string, triggerField: string) => {
-    const currentValue = workflow.actions.find(a => a.id === actionId)?.config[field] || '';
-    const mapping = `{{trigger.${triggerField}}}`;
-    updateActionConfig(actionId, field, currentValue ? `${currentValue} ${mapping}` : mapping);
-  };
-
   const getTriggerFields = () => {
     if (!triggerSample) return [];
     const flatten = (obj: any, prefix = ''): string[] => {
@@ -245,89 +243,167 @@ export default function WorkflowBuilder() {
     return flatten(triggerSample);
   };
 
+  const getFieldTypeIcon = (value: any) => {
+    if (typeof value === 'number') return Hash;
+    if (typeof value === 'boolean') return ToggleLeft;
+    if (value instanceof Date || (typeof value === 'string' && /\d{4}-\d{2}-\d{2}/.test(value))) return Calendar;
+    if (Array.isArray(value)) return List;
+    return Type;
+  };
+
+  const insertFieldMapping = (actionId: string, field: string, triggerField: string) => {
+    const currentValue = workflow.actions.find(a => a.id === actionId)?.config[field] || '';
+    const mapping = `{{trigger.${triggerField}}}`;
+    updateActionConfig(actionId, field, currentValue ? `${currentValue} ${mapping}` : mapping);
+  };
+
+  const insertTransformation = (actionId: string, field: string, transform: string) => {
+    const currentValue = workflow.actions.find(a => a.id === actionId)?.config[field] || '';
+    const transformed = `{{${transform}(trigger.field)}}`.replace('trigger.field', currentValue.split('.').pop() || 'field');
+    updateActionConfig(actionId, field, transformed);
+  };
+
+  const transformations = [
+    { id: 'uppercase', label: 'UPPERCASE', icon: Type },
+    { id: 'lowercase', label: 'lowercase', icon: Type },
+    { id: 'trim', label: 'trim', icon: X },
+    { id: 'capitalize', label: 'Capitalize', icon: Type },
+    { id: 'date_format', label: 'Date Format', icon: Calendar },
+  ];
+
   const renderFieldInput = (actionId: string, field: any) => {
     const action = workflow.actions.find(a => a.id === actionId);
     if (!action) return null;
 
     const value = action.config[field.name] || '';
-    const hasMapping = typeof value === 'string' && value.includes('{{trigger.');
+    const hasMapping = typeof value === 'string' && value.includes('{{');
 
-    if (field.type === 'text') {
-      return (
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
+            {field.label}
+            {field.required && <span className="text-rose-400">*</span>}
+          </label>
+          {field.type === 'select' && field.options && (
+            <div className="relative">
+              <select
+                value={value}
+                onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
+                className="appearance-none pr-8 pl-3 py-1.5 bg-slate-800 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+              >
+                <option value="">Select...</option>
+                {field.options.map((opt: string) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+          )}
+        </div>
+        
+        {/* Field Input */}
         <div className="relative">
-          <textarea
-            value={value}
-            onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
-            placeholder={hasMapping ? '' : `Enter ${field.label.toLowerCase()}...`}
-            rows={3}
-            className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm font-mono resize-none"
-          />
+          {field.type === 'text' ? (
+            <textarea
+              value={value}
+              onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
+              placeholder={`Enter ${field.label.toLowerCase()}...`}
+              rows={3}
+              className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm font-mono resize-none"
+            />
+          ) : field.type !== 'select' ? (
+            <input
+              type={field.type === 'number' ? 'number' : 'text'}
+              value={value}
+              onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
+              placeholder={`Enter ${field.label.toLowerCase()}...`}
+              className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm font-mono"
+            />
+          ) : null}
+          
+          {/* Field Mapping Button */}
           {triggerSample && (
             <button
               onClick={() => setShowFieldMapper(showFieldMapper === `${actionId}-${field.name}` ? null : `${actionId}-${field.name}`)}
-              className="absolute top-2 right-2 p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all ${
+                hasMapping 
+                  ? 'bg-emerald-500/20 text-emerald-400' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+              }`}
               title="Insert field from trigger"
             >
-              <Copy className="w-3.5 h-3.5 text-emerald-400" />
+              {hasMapping ? <Wand2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           )}
-          {showFieldMapper === `${actionId}-${field.name}` && triggerSample && (
-            <motion.div
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/10 rounded-xl p-3 z-20 max-h-48 overflow-y-auto"
-            >
-              <p className="text-xs text-slate-400 mb-2 font-medium">Insert from trigger data:</p>
-              {getTriggerFields().map(f => (
-                <button
-                  key={f}
-                  onClick={() => { insertFieldMapping(actionId, field.name, f); setShowFieldMapper(null); }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition-colors font-mono"
-                >
-                  {f}
-                </button>
-              ))}
-            </motion.div>
-          )}
         </div>
-      );
-    }
 
-    return (
-      <div className="relative">
-        <input
-          type={field.type === 'number' ? 'number' : 'text'}
-          value={value}
-          onChange={(e) => updateActionConfig(actionId, field.name, e.target.value)}
-          placeholder={hasMapping ? '' : `Enter ${field.label.toLowerCase()}...`}
-          className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 text-sm font-mono"
-        />
-        {triggerSample && (
-          <button
-            onClick={() => setShowFieldMapper(showFieldMapper === `${actionId}-${field.name}` ? null : `${actionId}-${field.name}`)}
-            className="absolute top-2 right-2 p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-            title="Insert field from trigger"
-          >
-            <Copy className="w-3.5 h-3.5 text-emerald-400" />
-          </button>
-        )}
+        {/* Field Mapping Panel */}
         {showFieldMapper === `${actionId}-${field.name}` && triggerSample && (
           <motion.div
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/10 rounded-xl p-3 z-20 max-h-48 overflow-y-auto"
+            className="bg-slate-800 border border-white/10 rounded-xl overflow-hidden"
           >
-            <p className="text-xs text-slate-400 mb-2 font-medium">Insert from trigger data:</p>
-            {getTriggerFields().map(f => (
-              <button
-                key={f}
-                onClick={() => { insertFieldMapping(actionId, field.name, f); setShowFieldMapper(null); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition-colors font-mono"
-              >
-                {f}
-              </button>
-            ))}
+            <div className="p-3 border-b border-white/5 bg-slate-800/50">
+              <p className="text-xs text-slate-400 font-medium">Available Fields</p>
+            </div>
+            <div className="max-h-48 overflow-y-auto">
+              {getTriggerFields().map(f => {
+                const FieldIcon = getFieldTypeIcon(triggerSample);
+                const fieldValue = f.split('.').reduce((obj: any, key: string) => obj?.[key], triggerSample);
+                return (
+                  <button
+                    key={f}
+                    onClick={() => { insertFieldMapping(actionId, field.name, f); setShowFieldMapper(null); }}
+                    className="w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-slate-700/50 transition-colors border-b border-white/5 last:border-b-0"
+                  >
+                    <FieldIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-300 font-mono truncate">{f}</div>
+                      <div className="text-xs text-slate-500 truncate">
+                        {typeof fieldValue === 'object' ? JSON.stringify(fieldValue).slice(0, 30) : String(fieldValue || 'empty')}
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3 h-3 text-slate-600" />
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* Transformations */}
+            {hasMapping && (
+              <div className="p-3 border-t border-white/5 bg-slate-800/50">
+                <p className="text-xs text-slate-400 font-medium mb-2">Transform</p>
+                <div className="flex flex-wrap gap-1">
+                  {transformations.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => insertTransformation(actionId, field.name, t.id)}
+                      className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition-colors flex items-center gap-1"
+                    >
+                      <t.icon className="w-3 h-3" />
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
+        )}
+        
+        {/* Current Mapping Indicator */}
+        {hasMapping && (
+          <div className="flex items-center gap-2 text-xs text-emerald-400 mt-1">
+            <Wand2 className="w-3 h-3" />
+            <span>Dynamic field mapping active</span>
+            <button 
+              onClick={() => updateActionConfig(actionId, field.name, '')}
+              className="ml-auto text-slate-500 hover:text-rose-400 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
         )}
       </div>
     );

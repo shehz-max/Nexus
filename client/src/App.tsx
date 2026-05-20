@@ -10,6 +10,7 @@ import Workflows from './pages/Workflows';
 import WorkflowBuilder from './pages/WorkflowBuilder';
 import Activity from './pages/Activity';
 import Settings from './pages/Settings';
+import Templates from './pages/Templates';
 import LandingPage from './pages/LandingPage';
 import { useAuthStore } from './store/auth';
 
@@ -57,6 +58,7 @@ function AppContent() {
         <Route path="workflows/:id" element={<WorkflowBuilder />} />
         <Route path="activity" element={<Activity />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="templates" element={<Templates />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   Bell,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 
@@ -33,6 +34,7 @@ const Logo = () => (
 const navItems = [
   { path: '/app', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/app/integrations', icon: Plug, label: 'Integrations' },
+  { path: '/app/templates', icon: LayoutTemplate, label: 'Templates' },
   { path: '/app/workflows', icon: WorkflowIcon, label: 'Workflows' },
   { path: '/app/activity', icon: Activity, label: 'Activity' },
   { path: '/app/settings', icon: Settings, label: 'Settings' },

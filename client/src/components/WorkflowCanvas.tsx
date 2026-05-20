@@ -107,13 +107,14 @@ export default function WorkflowCanvas({
 
   const calculateNodePositions = () => {
     const nodes: Array<{ id: string; type: string; label: string; sublabel: string; icon: string; position: NodePosition; color: keyof typeof NodeColors }> = [];
-    const NODE_WIDTH = 280;
-    const NODE_HEIGHT = 80;
-    const SPACING_Y = 120;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const NODE_WIDTH = isMobile ? 240 : 280;
+    const NODE_HEIGHT = isMobile ? 70 : 80;
+    const SPACING_Y = isMobile ? 100 : 120;
     const START_Y = 60;
-    const TRIGGER_X = 80;
-    const ACTION_X = 400;
-    const CONDITION_X = 720;
+    const TRIGGER_X = isMobile ? 40 : 80;
+    const ACTION_X = isMobile ? 300 : 400;
+    const CONDITION_X = isMobile ? 560 : 720;
 
     // Trigger node
     if (trigger && triggerIntegration) {

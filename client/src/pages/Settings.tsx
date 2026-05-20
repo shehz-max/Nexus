@@ -30,12 +30,12 @@ export default function Settings() {
         <p className="text-slate-400">Manage your account preferences</p>
       </div>
 
-      <div className="flex items-center gap-2 p-1 bg-slate-900/50 rounded-xl w-fit">
+      <div className="flex items-center gap-2 p-1 bg-slate-900/50 rounded-xl w-full overflow-x-auto no-scrollbar">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-emerald-500 text-slate-950'
                 : 'text-slate-400 hover:text-white'

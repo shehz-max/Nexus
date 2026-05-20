@@ -8,5 +8,6 @@
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/(.*)", "dest": "/client/dist/$1", "status": 200 }
   ],
-  "installCommand": "npm install && npx prisma generate"
+  "installCommand": "npm install && cd client && npm install",
+  "buildCommand": "cd client && npm install && npm run build"
 }

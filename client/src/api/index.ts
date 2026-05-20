@@ -1,4 +1,4 @@
-const API_BASE = (typeof window !== 'undefined' ? window.location.origin : '');
+const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE}/api${endpoint}`;

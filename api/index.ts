@@ -360,6 +360,102 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               { id: 'list_payments', name: 'List Payments', description: 'List recent payments', inputFields: [{ name: 'customer', type: 'string', required: false, label: 'Customer ID' }, { name: 'limit', type: 'number', required: false, label: 'Max Results' }] },
             ]
           },
+          {
+            id: 'airtable', slug: 'airtable', name: 'Airtable', description: 'Cloud-based spreadsheet and database', icon: '🗃️', category: 'Database', authType: 'oauth2',
+            triggers: [
+              { id: 'new_record', name: 'New Record', description: 'Triggers when a new record is created', type: 'polling', sample: { recordId: 'rec123', fields: { Name: 'John Doe', Status: 'New' }, createdAt: '2024-01-01' } },
+              { id: 'record_updated', name: 'Record Updated', description: 'Triggers when a record is modified', type: 'polling', sample: { recordId: 'rec123', fields: { Name: 'John Doe', Status: 'In Progress' }, updatedAt: '2024-01-01', changes: ['Status'] } },
+              { id: 'new_field', name: 'New Field Added', description: 'Triggers when a new field is added to table', type: 'polling', sample: { tableId: 'tbl123', field: 'Priority', type: 'singleSelect' } },
+              { id: 'record_deleted', name: 'Record Deleted', description: 'Triggers when a record is deleted', type: 'polling', sample: { recordId: 'rec123', tableId: 'tbl123' } },
+            ],
+            actions: [
+              { id: 'create_record', name: 'Create Record', description: 'Create a new record', inputFields: [{ name: 'baseId', type: 'string', required: true, label: 'Base ID' }, { name: 'tableId', type: 'string', required: true, label: 'Table ID' }, { name: 'fields', type: 'object', required: true, label: 'Fields (JSON)' }] },
+              { id: 'update_record', name: 'Update Record', description: 'Update existing record', inputFields: [{ name: 'baseId', type: 'string', required: true, label: 'Base ID' }, { name: 'tableId', type: 'string', required: true, label: 'Table ID' }, { name: 'recordId', type: 'string', required: true, label: 'Record ID' }, { name: 'fields', type: 'object', required: true, label: 'Fields (JSON)' }] },
+              { id: 'find_record', name: 'Find Record', description: 'Find record by field value', inputFields: [{ name: 'baseId', type: 'string', required: true, label: 'Base ID' }, { name: 'tableId', type: 'string', required: true, label: 'Table ID' }, { name: 'field', type: 'string', required: true, label: 'Field Name' }, { name: 'value', type: 'string', required: true, label: 'Search Value' }] },
+              { id: 'delete_record', name: 'Delete Record', description: 'Delete a record', inputFields: [{ name: 'baseId', type: 'string', required: true, label: 'Base ID' }, { name: 'tableId', type: 'string', required: true, label: 'Table ID' }, { name: 'recordId', type: 'string', required: true, label: 'Record ID' }] },
+              { id: 'get_record', name: 'Get Record', description: 'Get record by ID', inputFields: [{ name: 'baseId', type: 'string', required: true, label: 'Base ID' }, { name: 'tableId', type: 'string', required: true, label: 'Table ID' }, { name: 'recordId', type: 'string', required: true, label: 'Record ID' }] },
+              { id: 'list_records', name: 'List Records', description: 'List records from table', inputFields: [{ name: 'baseId', type: 'string', required: true, label: 'Base ID' }, { name: 'tableId', type: 'string', required: true, label: 'Table ID' }, { name: 'filter', type: 'text', required: false, label: 'Filter Formula' }, { name: 'maxRecords', type: 'number', required: false, label: 'Max Records' }] },
+            ]
+          },
+          {
+            id: 'jira', slug: 'jira', name: 'Jira', description: 'Project and issue tracking', icon: '📋', category: 'Development', authType: 'oauth2',
+            triggers: [
+              { id: 'new_issue', name: 'New Issue Created', description: 'Triggers when a new issue is created', type: 'webhook', sample: { issueKey: 'PROJ-123', summary: 'Bug in login page', type: 'bug', priority: 'high', reporter: 'john@email.com' } },
+              { id: 'issue_transitioned', name: 'Issue Status Changed', description: 'Triggers when issue moves to different status', type: 'webhook', sample: { issueKey: 'PROJ-123', fromStatus: 'To Do', toStatus: 'In Progress', assignee: 'jane@email.com' } },
+              { id: 'comment_added', name: 'Comment Added', description: 'Triggers when comment is added to issue', type: 'webhook', sample: { issueKey: 'PROJ-123', comment: 'Fixed in latest commit', author: 'john@email.com' } },
+              { id: 'issue_assigned', name: 'Issue Assigned', description: 'Triggers when issue is assigned', type: 'webhook', sample: { issueKey: 'PROJ-123', assignee: 'jane@email.com', previousAssignee: 'john@email.com' } },
+              { id: 'sprint_started', name: 'Sprint Started', description: 'Triggers when a sprint begins', type: 'webhook', sample: { sprintName: 'Sprint 5', startDate: '2024-01-01', endDate: '2024-01-14' } },
+            ],
+            actions: [
+              { id: 'create_issue', name: 'Create Issue', description: 'Create a new issue', inputFields: [{ name: 'projectKey', type: 'string', required: true, label: 'Project Key' }, { name: 'summary', type: 'string', required: true, label: 'Summary' }, { name: 'description', type: 'text', required: false, label: 'Description' }, { name: 'issueType', type: 'select', required: true, label: 'Issue Type', options: ['bug', 'task', 'story', 'epic'] }, { name: 'priority', type: 'select', required: false, label: 'Priority', options: ['highest', 'high', 'medium', 'low', 'lowest'] }] },
+              { id: 'update_issue', name: 'Update Issue', description: 'Update issue fields', inputFields: [{ name: 'issueKey', type: 'string', required: true, label: 'Issue Key' }, { name: 'summary', type: 'string', required: false, label: 'Summary' }, { name: 'description', type: 'text', required: false, label: 'Description' }, { name: 'priority', type: 'select', required: false, label: 'Priority', options: ['highest', 'high', 'medium', 'low', 'lowest'] }] },
+              { id: 'add_comment', name: 'Add Comment', description: 'Add comment to issue', inputFields: [{ name: 'issueKey', type: 'string', required: true, label: 'Issue Key' }, { name: 'comment', type: 'text', required: true, label: 'Comment' }] },
+              { id: 'transition_issue', name: 'Transition Issue', description: 'Move issue to new status', inputFields: [{ name: 'issueKey', type: 'string', required: true, label: 'Issue Key' }, { name: 'status', type: 'select', required: true, label: 'Status', options: ['To Do', 'In Progress', 'In Review', 'Done'] }] },
+              { id: 'assign_issue', name: 'Assign Issue', description: 'Assign issue to user', inputFields: [{ name: 'issueKey', type: 'string', required: true, label: 'Issue Key' }, { name: 'assignee', type: 'string', required: true, label: 'Assignee (email)' }] },
+              { id: 'link_issues', name: 'Link Issues', description: 'Link two issues', inputFields: [{ name: 'issueKey', type: 'string', required: true, label: 'Issue Key' }, { name: 'linkedIssueKey', type: 'string', required: true, label: 'Linked Issue Key' }, { name: 'linkType', type: 'select', required: true, label: 'Link Type', options: ['blocks', 'is blocked by', 'duplicates', 'is duplicated by', 'relates to'] }] },
+              { id: 'add_attachment', name: 'Add Attachment', description: 'Attach file to issue', inputFields: [{ name: 'issueKey', type: 'string', required: true, label: 'Issue Key' }, { name: 'fileUrl', type: 'string', required: true, label: 'File URL' }, { name: 'fileName', type: 'string', required: false, label: 'File Name' }] },
+            ]
+          },
+          {
+            id: 'google_drive', slug: 'google-drive', name: 'Google Drive', description: 'Cloud file storage and synchronization', icon: '📁', category: 'Files', authType: 'oauth2',
+            triggers: [
+              { id: 'new_file', name: 'New File', description: 'Triggers when new file is created', type: 'polling', sample: { fileId: 'abc123', name: 'Report.pdf', mimeType: 'application/pdf', size: 102400, createdAt: '2024-01-01' } },
+              { id: 'file_updated', name: 'File Updated', description: 'Triggers when file is modified', type: 'polling', sample: { fileId: 'abc123', name: 'Report.pdf', modifiedAt: '2024-01-01', modifiedBy: 'john@email.com' } },
+              { id: 'new_folder', name: 'New Folder', description: 'Triggers when new folder is created', type: 'polling', sample: { folderId: 'folder123', name: 'Project Files', createdAt: '2024-01-01' } },
+              { id: 'file_shared', name: 'File Shared', description: 'Triggers when file is shared', type: 'polling', sample: { fileId: 'abc123', sharedWith: 'jane@email.com', permission: 'reader' } },
+            ],
+            actions: [
+              { id: 'upload_file', name: 'Upload File', description: 'Upload file to Drive', inputFields: [{ name: 'folderId', type: 'string', required: false, label: 'Folder ID' }, { name: 'fileName', type: 'string', required: true, label: 'File Name' }, { name: 'content', type: 'text', required: true, label: 'Content (base64)' }, { name: 'mimeType', type: 'string', required: false, label: 'Mime Type' }] },
+              { id: 'create_folder', name: 'Create Folder', description: 'Create new folder', inputFields: [{ name: 'name', type: 'string', required: true, label: 'Folder Name' }, { name: 'parentId', type: 'string', required: false, label: 'Parent Folder ID' }] },
+              { id: 'share_file', name: 'Share File', description: 'Share file with someone', inputFields: [{ name: 'fileId', type: 'string', required: true, label: 'File ID' }, { name: 'email', type: 'string', required: true, label: 'Email Address' }, { name: 'role', type: 'select', required: true, label: 'Role', options: ['reader', 'writer', 'commenter'] }, { name: 'type', type: 'select', required: false, label: 'Share Type', options: ['user', 'group', 'domain'] }] },
+              { id: 'move_file', name: 'Move File', description: 'Move file to folder', inputFields: [{ name: 'fileId', type: 'string', required: true, label: 'File ID' }, { name: 'folderId', type: 'string', required: true, label: 'Destination Folder ID' }] },
+              { id: 'copy_file', name: 'Copy File', description: 'Copy file', inputFields: [{ name: 'fileId', type: 'string', required: true, label: 'File ID' }, { name: 'name', type: 'string', required: true, label: 'New File Name' }, { name: 'folderId', type: 'string', required: false, label: 'Destination Folder ID' }] },
+              { id: 'delete_file', name: 'Delete File', description: 'Move file to trash', inputFields: [{ name: 'fileId', type: 'string', required: true, label: 'File ID' }] },
+              { id: 'list_files', name: 'List Files', description: 'List files in folder', inputFields: [{ name: 'folderId', type: 'string', required: false, label: 'Folder ID (root if empty)' }, { name: 'mimeType', type: 'string', required: false, label: 'Filter by Mime Type' }, { name: 'maxResults', type: 'number', required: false, label: 'Max Results' }] },
+              { id: 'get_file', name: 'Get File', description: 'Get file metadata', inputFields: [{ name: 'fileId', type: 'string', required: true, label: 'File ID' }] },
+            ]
+          },
+          {
+            id: 'dropbox', slug: 'dropbox', name: 'Dropbox', description: 'Cloud storage and file sharing', icon: '📦', category: 'Files', authType: 'oauth2',
+            triggers: [
+              { id: 'new_file', name: 'New File', description: 'Triggers when file is uploaded', type: 'polling', sample: { fileId: 'id123', name: 'document.pdf', path: '/Documents/', size: 512000, modifiedAt: '2024-01-01' } },
+              { id: 'file_shared', name: 'File Shared', description: 'Triggers when file is shared', type: 'polling', sample: { fileId: 'id123', sharedLink: 'https://dropbox.link/abc', sharedAt: '2024-01-01' } },
+              { id: 'folder_deleted', name: 'Folder Deleted', description: 'Triggers when folder is deleted', type: 'polling', sample: { folderId: 'folder123', path: '/Archive/' } },
+            ],
+            actions: [
+              { id: 'upload_file', name: 'Upload File', description: 'Upload file to Dropbox', inputFields: [{ name: 'path', type: 'string', required: true, label: 'Path (e.g., /folder/file.txt)' }, { name: 'content', type: 'text', required: true, label: 'Content (base64)' }, { name: 'mode', type: 'select', required: false, label: 'Mode', options: ['add', 'overwrite', 'update'] }] },
+              { id: 'create_folder', name: 'Create Folder', description: 'Create new folder', inputFields: [{ name: 'path', type: 'string', required: true, label: 'Path' }, { name: 'autorename', type: 'boolean', required: false, label: 'Auto Rename if exists?' }] },
+              { id: 'share_file', name: 'Create Shared Link', description: 'Create shared link for file', inputFields: [{ name: 'path', type: 'string', required: true, label: 'Path' }, { name: 'visibility', type: 'select', required: false, label: 'Visibility', options: ['public', 'team_only', 'password'] }] },
+              { id: 'move_file', name: 'Move File', description: 'Move file to new location', inputFields: [{ name: 'fromPath', type: 'string', required: true, label: 'From Path' }, { name: 'toPath', type: 'string', required: true, label: 'To Path' }] },
+              { id: 'copy_file', name: 'Copy File', description: 'Copy file', inputFields: [{ name: 'fromPath', type: 'string', required: true, label: 'From Path' }, { name: 'toPath', type: 'string', required: true, label: 'To Path' }] },
+              { id: 'delete_file', name: 'Delete File', description: 'Delete file', inputFields: [{ name: 'path', type: 'string', required: true, label: 'Path' }] },
+              { id: 'list_files', name: 'List Files', description: 'List files in folder', inputFields: [{ name: 'path', type: 'string', required: false, label: 'Path (root if empty)' }, { name: 'maxResults', type: 'number', required: false, label: 'Max Results' }] },
+              { id: 'get_file', name: 'Get File Metadata', description: 'Get file info', inputFields: [{ name: 'path', type: 'string', required: true, label: 'Path' }] },
+              { id: 'download_file', name: 'Download File', description: 'Download file content', inputFields: [{ name: 'path', type: 'string', required: true, label: 'Path' }] },
+            ]
+          },
+          {
+            id: 'shopify', slug: 'shopify', name: 'Shopify', description: 'E-commerce platform', icon: '🛒', category: 'E-commerce', authType: 'oauth2',
+            triggers: [
+              { id: 'new_order', name: 'New Order', description: 'Triggers when new order is created', type: 'webhook', sample: { orderId: '1001', total: 99.99, customer: 'John Doe', email: 'john@email.com', items: 3 } },
+              { id: 'order_paid', name: 'Order Paid', description: 'Triggers when order payment is captured', type: 'webhook', sample: { orderId: '1001', amount: 99.99, paymentMethod: 'credit_card' } },
+              { id: 'order_cancelled', name: 'Order Cancelled', description: 'Triggers when order is cancelled', type: 'webhook', sample: { orderId: '1001', reason: 'Customer request', refundStatus: 'pending' } },
+              { id: 'new_customer', name: 'New Customer', description: 'Triggers when new customer signs up', type: 'webhook', sample: { customerId: 'cust123', email: 'john@email.com', firstName: 'John', lastName: 'Doe' } },
+              { id: 'product_created', name: 'Product Created', description: 'Triggers when new product is added', type: 'webhook', sample: { productId: 'prod123', title: 'T-Shirt', price: 29.99, inventory: 100 } },
+              { id: 'low_inventory', name: 'Low Inventory Alert', description: 'Triggers when product inventory is low', type: 'webhook', sample: { productId: 'prod123', title: 'T-Shirt', inventory: 5, threshold: 10 } },
+            ],
+            actions: [
+              { id: 'create_order', name: 'Create Order', description: 'Create new order', inputFields: [{ name: 'lineItems', type: 'text', required: true, label: 'Line Items (JSON)' }, { name: 'customerId', type: 'string', required: false, label: 'Customer ID' }, { name: 'email', type: 'string', required: false, label: 'Customer Email' }, { name: 'note', type: 'text', required: false, label: 'Note' }] },
+              { id: 'update_order', name: 'Update Order', description: 'Update order details', inputFields: [{ name: 'orderId', type: 'string', required: true, label: 'Order ID' }, { name: 'note', type: 'text', required: false, label: 'Note' }, { name: 'tags', type: 'string', required: false, label: 'Tags (comma-separated)' }] },
+              { id: 'cancel_order', name: 'Cancel Order', description: 'Cancel an order', inputFields: [{ name: 'orderId', type: 'string', required: true, label: 'Order ID' }, { name: 'reason', type: 'select', required: false, label: 'Reason', options: ['inventory', 'customer', 'fraud', 'other'] }] },
+              { id: 'create_customer', name: 'Create Customer', description: 'Create new customer', inputFields: [{ name: 'email', type: 'string', required: true, label: 'Email' }, { name: 'firstName', type: 'string', required: false, label: 'First Name' }, { name: 'lastName', type: 'string', required: false, label: 'Last Name' }, { name: 'phone', type: 'string', required: false, label: 'Phone' }] },
+              { id: 'update_inventory', name: 'Update Inventory', description: 'Update product inventory', inputFields: [{ name: 'inventoryItemId', type: 'string', required: true, label: 'Inventory Item ID' }, { name: 'locationId', type: 'string', required: true, label: 'Location ID' }, { name: 'available', type: 'number', required: true, label: 'Available Quantity' }] },
+              { id: 'send_fulfillment', name: 'Create Fulfillment', description: 'Create fulfillment for order', inputFields: [{ name: 'orderId', type: 'string', required: true, label: 'Order ID' }, { name: 'trackingNumber', type: 'string', required: false, label: 'Tracking Number' }, { name: 'trackingCompany', type: 'string', required: false, label: 'Tracking Company' }, { name: 'lineItems', type: 'text', required: false, label: 'Line Items (JSON, all if empty)' }] },
+              { id: 'add_tags', name: 'Add Tags to Order', description: 'Add tags to existing order', inputFields: [{ name: 'orderId', type: 'string', required: true, label: 'Order ID' }, { name: 'tags', type: 'string', required: true, label: 'Tags (comma-separated)' }] },
+              { id: 'get_order', name: 'Get Order', description: 'Retrieve order details', inputFields: [{ name: 'orderId', type: 'string', required: true, label: 'Order ID' }] },
+              { id: 'refund_order', name: 'Refund Order', description: 'Create refund for order', inputFields: [{ name: 'orderId', type: 'string', required: true, label: 'Order ID' }, { name: 'reason', type: 'select', required: false, label: 'Reason', options: ['duplicate', 'fraudulent', 'requested_by_customer'] }, { name: 'note', type: 'text', required: false, label: 'Note' }] },
+            ]
+          },
         ];
         return res.status(200).json({ success: true, data: { integrations } });
       }

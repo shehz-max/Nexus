@@ -22,27 +22,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
   const userId = getUserIdFromToken(req.headers.authorization);
 
-  try {
-    switch (action) {
-      case 'login': {
-        if (req.method !== 'POST') return res.status(405).json({ success: false, error: { message: 'Method not allowed' } });
-        
-        const { email, password } = req.body || {};
-        if (!email || !password) return res.status(400).json({ success: false, error: { statusCode: 400, message: 'Email and password required' } });
+try {
+  switch (action) {
+    case 'login': {
+      if (req.method !== 'POST') return res.status(405).json({ success: false, error: { message: 'Method not allowed' } });
+      
+      const { email, password } = req.body || {};
+      if (!email || !password) return res.status(400).json({ success: false, error: { statusCode: 400, message: 'Email and password required' } });
 
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
 
-        const validPassword = await bcrypt.compare(password, user.passwordHash);
-        if (!validPassword) return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
+      const validPassword = await bcrypt.compare(password, user.passwordHash);
+      if (!validPassword) return res.status(401).json({ success: false, error: { statusCode: 401, message: 'Invalid credentials' } });
 
-        const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
+      const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
 
-        return res.status(200).json({
-          success: true,
-          data: { user: { id: user.id, email: user.email, name: user.name, plan: user.plan, avatarUrl: user.avatarUrl }, token },
-        });
-      }
+      return res.status(200).json({
+        success: true,
+        data: { user: { id: user.id, email: user.email, name: user.name, plan: user.plan, avatarUrl: user.avatarUrl }, token },
+      });
+    }
 
       case 'register': {
         if (req.method !== 'POST') return res.status(405).json({ success: false, error: { message: 'Method not allowed' } });
@@ -123,8 +123,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       default:
         return res.status(400).json({ success: false, error: { message: 'Invalid action' } });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auth error:', error);
-    return res.status(500).json({ success: false, error: { statusCode: 500, message: 'Internal server error' } });
+    const message = error?.message || 'Internal server error';
+    return res.status(500).json({ success: false, error: { statusCode: 500, message } });
+  } finally {
+    await prisma.$disconnect().catch(() => {});
   }
 }

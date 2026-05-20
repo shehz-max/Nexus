@@ -1,12 +1,18 @@
 {
   "builds": [
-    { "src": "api/*.ts", "use": "@vercel/node" }
+    { "src": "api/index.ts", "use": "@vercel/node" },
+    { "src": "api/auth.ts", "use": "@vercel/node" },
+    { "src": "api/webhook.ts", "use": "@vercel/node" },
+    { "src": "client/dist/**", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/api/auth", "dest": "/api/auth.ts" },
-    { "src": "/api/index", "dest": "/api/index.ts" },
-    { "src": "/api/webhook", "dest": "/api/webhook.ts" },
+    { "src": "/api/index", "dest": "/api/index" },
+    { "src": "/api/auth", "dest": "/api/auth" },
+    { "src": "/api/webhook", "dest": "/api/webhook" },
+    { "src": "/favicon.svg", "dest": "/client/dist/favicon.svg" },
     { "src": "/assets/(.*)", "dest": "/client/dist/assets/$1" },
-    { "src": "/(.*)", "dest": "/client/dist/$1", "status": 200 }
-  ]
+    { "src": "/(.*)", "dest": "/client/dist/index.html" }
+  ],
+  "installCommand": "cd client && npm install && cd ../api && npm install && cd ../ && npx prisma generate",
+  "buildCommand": "cd client && npm run build"
 }

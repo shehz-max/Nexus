@@ -1,11 +1,12 @@
 {
-  "framework": "vite",
-  "buildCommand": "cd client && npm run build",
-  "outputDirectory": "client/dist",
-  "installCommand": "cd client && npm install",
-  "functions": {
-    "api/index.ts": {},
-    "api/auth.ts": {},
-    "api/webhook.ts": {}
-  }
+  "builds": [
+    { "src": "api/*.ts", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/auth", "dest": "/api/auth.ts" },
+    { "src": "/api/index", "dest": "/api/index.ts" },
+    { "src": "/api/webhook", "dest": "/api/webhook.ts" },
+    { "src": "/assets/(.*)", "dest": "/client/dist/assets/$1" },
+    { "src": "/(.*)", "dest": "/client/dist/$1", "status": 200 }
+  ]
 }

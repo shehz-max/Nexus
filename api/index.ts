@@ -1,7 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient({
+      log: ['error'],
+    });
+  }
+  return prisma;
+}
 
 function getUserIdFromToken(authHeader: string | undefined): string | null {
   if (!authHeader) return null;
@@ -15,6 +24,8 @@ function getUserIdFromToken(authHeader: string | undefined): string | null {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { resource, id, page, limit, workflowId, status } = req.query;
   const userId = getUserIdFromToken(req.headers.authorization);
+
+  res.setHeader('Content-Type', 'application/json');
 
   try {
     switch (resource) {
@@ -1271,9 +1282,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       default:
         return res.status(400).json({ success: false, error: { message: 'Invalid resource' } });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('API error:', error);
-    return res.status(500).json({ success: false, error: { statusCode: 500, message: 'Internal server error' } });
+    return res.status(500).json({ success: false, error: { statusCode: 500, message: error?.message || 'Internal server error' } });
   }
 }
 

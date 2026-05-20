@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd client && npm install && npm run build",
+  "buildCommand": "cd client && npm install && npm run build && npx prisma generate",
   "outputDirectory": "client/dist",
   "installCommand": "npm install && cd api && npm install",
   "framework": "vite",

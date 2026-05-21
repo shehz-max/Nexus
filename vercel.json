@@ -2,6 +2,9 @@
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
   "installCommand": "npm install",
+  "env": {
+    "DATABASE_URL": "postgresql://postgres.gwzwfyyylgeposbqsthd:Tz4Pp3x4dvornrMf@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

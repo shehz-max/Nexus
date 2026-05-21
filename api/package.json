@@ -1,0 +1,8 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "dependencies": {
+    "@vercel/node": "^3.0.0",
+    "bcryptjs": "^2.4.3"
+  }
+}
